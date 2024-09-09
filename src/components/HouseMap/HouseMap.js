@@ -16,6 +16,7 @@ import {
   faHome,
   faSchool,
   faChalkboardTeacher,
+  faFaucet,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFan,
@@ -57,6 +58,7 @@ const ICON_MAPPING = {
   projector: faVideo,
   TV: faLaptop,
   ClassRoom: faChalkboardTeacher,
+  Faucet: faFaucet
 };
 
 const SENSOR_ICON_MAPPING = {

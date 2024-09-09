@@ -32,6 +32,7 @@ import {
   faQuestionCircle,
   faRuler,
   faUser,
+  faFaucet,
 } from "@fortawesome/free-solid-svg-icons";
 import styles from "./RoomMap.module.scss";
 import Modal from "react-modal";
@@ -58,7 +59,8 @@ const ICON_MAPPING = {
   computer: faDesktop,
   projector: faVideo,
   TV:   faLaptop,
-  ClassRoom: faChalkboardTeacher
+  ClassRoom: faChalkboardTeacher,
+  Faucet: faFaucet
 };
 
 
