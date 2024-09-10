@@ -127,6 +127,7 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
   const isHeaterDevice = device_name.toLowerCase() === "heater";
   const isLaundryDevice = device_name.toLowerCase() === "laundry";
   const isPumpDevice = device_name.toLowerCase() === "pump";
+  const isTapDevice = device_name.toLowerCase === "tap";
 // Assuming you're inside a React functional component
   const [temperatureUnit, setTemperatureUnit] = useState('C'); // Default to Celsius
   const [raspberryPiIP, setRaspberryPiIP] = useState('');
@@ -291,6 +292,12 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
           // Adjust the payload to match the expected API format
           // const payloadForPlug = {  deviceId: '4', state: newState };
                   requests.push(axios.post(`${SERVER_URL}/api-mindolife/change-feature-state`, basePayload));
+        }
+        else if(device.device_name.toLowerCase() === 'tap'){
+          console.log(device.device_name);
+          console.log('tap is turned:', newState ? "ON" : "OFF");
+          // api call
+
         }
         
         const results = await Promise.allSettled(requests);
