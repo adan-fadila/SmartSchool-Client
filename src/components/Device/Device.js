@@ -253,7 +253,7 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
       
     const onDeviceChange = async (device, e, spaceId, device_id) => {
       const newState = e.target.checked;
-      console.log(device, newState);
+      console.log(device, newState,device_id);
       setState(newState); 
       setcolor(newState ? "green" : "red");
       // const deviceId = device.id.includes("YNahUQcM") ? "YNahUQcM" : "4ahpAkJ9";
@@ -268,6 +268,7 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
         const ACPayload = { state: newState, id: device_id, rasp_ip: raspberryPiIP };
         const basePayload = { state: newState, deviceId: device_id, rasp_ip: raspberryPiIP };
         const LIGHTPayload = {  id: device_id, rasp_ip: raspberryPiIP , Control: 'manual' };
+        const LIGHTPayloadWITHOUTRPI = { state: newState, id: device_id};
         if (device.device_name.toLowerCase() === 'ac') {
           console.log("is here");
           requests.push(axios.post(`${SERVER_URL}/api-sensors/sensibo`, ACPayload));
@@ -297,7 +298,8 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
           console.log(device.device_name);
           console.log('tap is turned:', newState ? "ON" : "OFF");
           // api call
-
+          console.log(LIGHTPayloadWITHOUTRPI.state)
+          requests.push(axios.put(`${SERVER_URL}/api-device/room-devices`, LIGHTPayloadWITHOUTRPI));
         }
         
         const results = await Promise.allSettled(requests);
