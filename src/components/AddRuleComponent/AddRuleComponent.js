@@ -158,7 +158,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
       condition = `If hour ${conditionKeyword} ${roomName} is ${timePeriod} ${operatorBefore} temperature ${temperatureCondition} ${temperatureValue}`;
     } else if (conditionType === 'eventType') {
       condition = `If ${conditionKeyword} ${eventType} in ${roomName}${
-        conditionKeyword === 'start' ? ` ${operatorAfter} season is ${season}` : ''
+        conditionKeyword === 'start' ? ` ${operatorBefore} season is ${season}` : ''
       }`;
     }
 
