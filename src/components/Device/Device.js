@@ -297,9 +297,9 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
         else if(device.device_name.toLowerCase() === 'tap'){
           console.log(device.device_name);
           console.log('tap is turned:', newState ? "ON" : "OFF");
-          // api call
-          console.log(LIGHTPayloadWITHOUTRPI.state)
-          requests.push(axios.put(`${SERVER_URL}/api-device/room-devices`, LIGHTPayloadWITHOUTRPI));
+          // Adjust the payload to match the expected API format
+          // const payloadForPlug = {  deviceId: '4', state: newState };
+                  requests.push(axios.post(`${SERVER_URL}/api-mindolife/change-state`, basePayload));
         }
         
         const results = await Promise.allSettled(requests);
