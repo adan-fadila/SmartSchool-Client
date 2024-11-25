@@ -84,8 +84,19 @@ export const SuggestionsTable = ({ setNewSuggestionsCount }) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const fetchedSuggestions = await getSuggestions();
-      setSuggestions(fetchedSuggestions);
+      try {
+        const response = await axios.get(`${SERVER_URL}/api/recommendations`);
+        // Transform recommendations to match the suggestions format
+        const transformedSuggestions = response.data.map((rec, index) => ({
+          id: index,
+          device: rec.device,
+          normalized_rule: `Turn ${rec.recommendation} during ${rec.recommended_time}`,
+          is_new: true // You can adjust this logic as needed
+        }));
+        setSuggestions(transformedSuggestions);
+      } catch (error) {
+        console.error('Error fetching recommendations:', error);
+      }
     };
     fetchData();
   }, []);
@@ -110,13 +121,13 @@ export const SuggestionsTable = ({ setNewSuggestionsCount }) => {
 
   return (
     <TableContainer>
-      <TitleStyled2>Suggestions</TitleStyled2>
+      <TitleStyled2>Recommendations</TitleStyled2>
       <TableStyled>
         <thead>
           <tr>
              <ThStyled>User</ThStyled>
             <ThStyled>Device</ThStyled>
-            <ThStyled>Suggested Rule</ThStyled>
+            <ThStyled>Recommended Action</ThStyled>
             <ThStyled>Actions</ThStyled>
           </tr>
         </thead>
