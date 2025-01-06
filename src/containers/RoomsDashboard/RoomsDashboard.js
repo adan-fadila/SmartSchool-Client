@@ -10,7 +10,7 @@ import { useParams } from "react-router-dom";
 import styled from "styled-components";
 import { NavLink } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
+import { faChevronLeft, faLightbulb } from "@fortawesome/free-solid-svg-icons";
 import iconMapping from './../../utils/fontawesome.icons';
 import Modal from 'react-modal';
 import HouseMap from '../../components/HouseMap/HouseMap';
@@ -21,6 +21,8 @@ import {jwtDecode} from 'jwt-decode'; // Correct import
 import { ReactTyped as Typed } from 'react-typed';
 import {LabelHeader } from '../RoomsDashboard/style'
 import { useSpace } from './../../contexts/SpaceContext';
+import { eventEmitter } from '../../WebSocket/ws';
+import { useAnomaly } from '../../contexts/AnomalyContext';
 
 const NavLinkStyled = styled(NavLink)`
   color: green;
@@ -33,6 +35,7 @@ const RoomsDashboard = ({ token }) => {
     const [modalIsOpen, setModalIsOpen] = useState(false);
     const [openAddActivityModal, setOpenAddActivityModal] = useState(false);
     const [tokenError, setTokenError] = useState(null);
+    const { anomalies, setRoomAnomaly } = useAnomaly();
     
 
     const navigate = useNavigate();
@@ -103,6 +106,31 @@ const RoomsDashboard = ({ token }) => {
         getRooms();
     }, [spaceId]);
 
+    useEffect(() => {
+        const handleAnomalyUpdate = (anomalyData) => {
+            console.log("Received anomaly update in RoomsDashboard:", {
+                roomId: anomalyData.roomId,
+                hasPlotImage: !!anomalyData.plotImage,
+                plotImageLength: anomalyData.plotImage?.length,
+                hasCollectivePlot: !!anomalyData.collectivePlot,
+                collectivePlotLength: anomalyData.collectivePlot?.length
+            });
+            
+            if (anomalyData.roomId && anomalyData.spaceId === spaceId) {
+                setRoomAnomaly(anomalyData.roomId, {
+                    deviceType: anomalyData.deviceType,
+                    hasAnomaly: true,
+                    timestamp: anomalyData.timestamp,
+                    plotImage: anomalyData.plot_image,
+                    collectivePlot: anomalyData.collective_plot,
+                    anomalies: anomalyData.anomalies  
+                });
+            }
+        };
+
+        eventEmitter.on('anomalyUpdate', handleAnomalyUpdate);
+        return () => eventEmitter.off('anomalyUpdate', handleAnomalyUpdate);
+    }, [spaceId]);
 
     const onClickRoomHandler = (roomId) => {
           // navigate(`/room/${roomId}`);
@@ -149,21 +177,36 @@ const RoomsDashboard = ({ token }) => {
                 <HouseMap onClose={() => setModalIsOpen(false)} spaceId={spaceId} />
             </Modal>
           <div className={roomsTest.length === 1 ? `${classes.RoomsContainer} ${classes.RoomsContainerStart}` : classes.RoomsContainer}>
-              {roomsTest.map((roomData) => (
-                  <div
-                      data-test={`room-card-${roomData.id}`}
-                      key={roomData.id}
-                      className={roomsTest.length === 1 ? classes.ColumnSingle : classes.Column}
-                      onClick={() => onClickRoomHandler(roomData.id, spaceId)}  // Added spaceId as a parameter
-                  >
-                      <Room
-                          id={roomData.id}
-                          name={roomData.name} // Assuming name is a property of the room object
-                          icon={iconMapping[roomData.icon]} // Assuming icon is a property of the room object
-                          devicesCount={roomData.devices ? roomData.devices.length : 0}
-                      />
-                  </div>
-              ))}
+              {roomsTest.map((roomData) => {
+                  console.log("Rendering room:", {
+                      id: roomData.id,
+                      idType: typeof roomData.id,
+                      hasAnomaly: anomalies.rooms[roomData.id]?.hasAnomaly
+                  });
+                  return (
+                      <div
+                          data-test={`room-card-${roomData.id}`}
+                          key={roomData.id}
+                          className={roomsTest.length === 1 ? classes.ColumnSingle : classes.Column}
+                          onClick={() => onClickRoomHandler(roomData.id)}
+                      >
+                          {anomalies.rooms[roomData.id]?.hasAnomaly && (
+                              <div className={classes.anomalyIndicator}>
+                                  <FontAwesomeIcon
+                                      icon={faLightbulb}
+                                      className={classes.flickeringIcon}
+                                  />
+                              </div>
+                          )}
+                          <Room
+                              id={roomData.id}
+                              name={roomData.name}
+                              icon={iconMapping[roomData.icon]}
+                              devicesCount={roomData.devices ? roomData.devices.length : 0}
+                          />
+                      </div>
+                  );
+              })}
           </div>
           <Outlet />
       </div>

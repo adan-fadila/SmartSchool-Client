@@ -23,6 +23,8 @@ import pumpService from '../../../services/pump.service';
 import RoomMap from '../../..//components/RoomMap/RoomMap';
 import iconMapping from './../../../utils/fontawesome.icons';
 import houseMapClasses from '../../../components/RoomMap/RoomMap.module.scss';
+import { useAnomaly } from '../../../contexts/AnomalyContext';
+import { faLightbulb } from "@fortawesome/free-solid-svg-icons";
 
 Modal.setAppElement('#root') 
 
@@ -34,28 +36,28 @@ const fadeIn = keyframes`
   }
   50% {
     opacity: 1;
-    width: 45%;
-    height: 40%;
+    width: 95%;
+    height: 95%;
   }
   100% {
     opacity: 1;
-    width: 40%; /* Final width value */
-    height: 35%; /* Final height value */
+    width: 90%;
+    height: 90%;
   }
 `;
 
 export const ModalStyled = styled(Modal)`
   position: fixed;
-  top: 45%;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   background: #fff;
   border-radius: 4px;
-  width: 40%;
-  height: 35%;
+  width: 90%;
+  height: 90%;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   margin: 1rem;
-  padding: 2rem
+  padding: 1.5rem;
   overflow: auto;
   display: flex;
   justify-content: center;
@@ -180,6 +182,12 @@ const RoomDevices = () => {
   const [pumpState, setPumpState] = useState('OFF');
   const [pumpDuration, setPumpDuration] = useState(0.05);
   const [modalIsOpen, setModalIsOpen] = useState(false);
+  const { anomalies, setRoomAnomaly, setSpaceAnomaly } = useAnomaly();
+  const [showAnomalyModal, setShowAnomalyModal] = useState(false);
+  const [anomalyImage, setAnomalyImage] = useState('');
+  const [plotImage, setPlotImage] = useState('');
+  const [collectivePlot, setCollectivePlot] = useState('');
+  const [anomalyDetails, setAnomalyDetails] = useState([]);
     
     
   const openHouseMap = () => {
@@ -254,7 +262,49 @@ const RoomDevices = () => {
   }, []);
 
   useEffect(() => {
-  }, [roomDevices]);
+    console.log("Current room ID:", id);
+    console.log("Current anomalies:", anomalies);
+    console.log("Room devices:", roomDevices);
+  }, [id, anomalies, roomDevices]);
+
+  useEffect(() => {
+    if (anomalies.rooms[id]) {
+        console.log("Full anomaly data:", anomalies.rooms[id]);
+        
+        // Extract the anomalies array from the WebSocket message
+        const anomalyArr = anomalies.rooms[id].anomalies || [];
+        const plotImg = anomalies.rooms[id].plotImage;
+        const collectiveImg = anomalies.rooms[id].collectivePlot;
+        
+        console.log("Processing anomaly array:", anomalyArr);
+        
+        if (plotImg) {
+            setPlotImage(plotImg);
+        }
+        if (collectiveImg) {
+            setCollectivePlot(collectiveImg);
+        }
+        if (Array.isArray(anomalyArr)) {
+            setAnomalyDetails(anomalyArr);
+            console.log("Set anomaly details:", anomalyArr);
+        }
+    }
+  }, [anomalies, id]);
+
+  const handleAnomalyClick = () => {
+    setShowAnomalyModal(true);
+  };
+
+  const handleDismissAnomaly = () => {
+    // Update both room and space anomalies
+    setRoomAnomaly(id, null);
+    setSpaceAnomaly(spaceId, null);
+    
+    // Close modal
+    setShowAnomalyModal(false);
+    
+    console.log("Anomaly dismissed successfully");
+  };
 
   if (!devices) return null;
 
@@ -278,27 +328,101 @@ const RoomDevices = () => {
       <H1>{_.get(room, "name")}</H1>
       <DevicesSection>
         {roomDevices.map((device) => {
-          const rooms = _.get(device, "rooms", []);
-          const { device_id } = device;
+          console.log("Full device data:", device);
+          console.log("Rendering device:", {
+            deviceId: device.device_id,
+            deviceName: device.name,
+            deviceType: device.device_type,
+            anomalyType: anomalies.rooms[id]?.deviceType
+          });
+          
           return (
-            <div key={device_id} className={classes.Column}>
+            <div key={device.device_id} className={classes.DeviceWrapper}>
+              {anomalies.rooms[id]?.deviceType === 'AC' && device.device_id === DEVICES_IDS_MAP.AC && (
+                <div 
+                  className={classes.anomalyIndicator}
+                  onClick={handleAnomalyClick}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <FontAwesomeIcon
+                    icon={faLightbulb}
+                    className={classes.flickeringIcon}
+                  />
+                </div>
+              )}
               <Device
-                spaceId={spaceId}
                 device={device}
-                onToggleDeviceSwitch={
-                  device.device_name === 'pump' ?
-                    () => handlePumpToggle({ state: pumpState, duration: pumpDuration })
-                    : IDS_TOGGLES_MAP[device_id]
-                }
-                laundryDetails={
-                  device.device_name === "laundry" ? laundryDetails : null
-                }
+                onToggleDeviceSwitch={IDS_TOGGLES_MAP[device.device_id]}
+                pumpDuration={pumpDuration}
+                setPumpDuration={setPumpDuration}
+                spaceId={spaceId}
               />
             </div>
           );
         })}
         <NewDevice setIsModalOpen={setIsModalOpen} />
       </DevicesSection>
+
+      <ModalStyled
+        isOpen={showAnomalyModal}
+        onRequestClose={() => setShowAnomalyModal(false)}
+        contentLabel="Anomaly Details"
+      >
+        <div className={classes.AnomalyModal}>
+          <h2>Anomaly Detected</h2>
+          
+          <div className={classes.AnomalyDetails}>
+            {anomalyDetails.length > 0 && (
+              <>
+                <h3>Detection Details</h3>
+                <div className={classes.AnomalyValues}>
+                  <h4>Anomaly Values:</h4>
+                  <ul>
+                    {anomalyDetails.map((detail, index) => (
+                      <li key={index}>
+                        <div className={classes.AnomalyItem}>
+                          <span className={classes.DetectionNumber}>Detection #{index + 1}</span>
+                          <span className={classes.AnomalyValue}>Value: {detail.anomaly_val.toFixed(2)}</span>
+                          <span className={classes.Algorithms}>
+                            Detected by: {detail.voting_algorithms.split(',').map(algo => algo.replace('Algorithm', '')).join(' & ')}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className={classes.ImagesContainer}>
+            {plotImage && (
+              <div className={classes.ImageSection}>
+                <h3>Anomaly Plot</h3>
+                <img 
+                  src={`data:image/png;base64,${plotImage}`} 
+                  alt="Anomaly Plot" 
+                  className={classes.AnomalyImage}
+                />
+              </div>
+            )}
+            {collectivePlot && (
+              <div className={classes.ImageSection}>
+                <h3>Collective Plot</h3>
+                <img 
+                  src={`data:image/png;base64,${collectivePlot}`} 
+                  alt="Collective Plot" 
+                  className={classes.AnomalyImage}
+                />
+              </div>
+            )}
+          </div>
+          
+          <button onClick={handleDismissAnomaly} className={classes.DismissButton}>
+            Dismiss Anomaly
+          </button>
+        </div>
+      </ModalStyled>
 
       {isModalOpen &&
         <ModalStyled isOpen={isModalOpen}>

@@ -15,6 +15,10 @@ import { NewSpaceModal } from "../../components/Spaces/NewSpaceModal";
 import UserContext from '../../contexts/UserContext';
 import Modal from "react-modal";
 import { useSpace } from './../../contexts/SpaceContext'; // Path to your SpaceContext file
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLightbulb } from "@fortawesome/free-solid-svg-icons";
+import { eventEmitter } from "../../WebSocket/ws.js";
+import { useAnomaly } from '../../contexts/AnomalyContext';
 
 const fadeIn = keyframes`
   0% {
@@ -82,6 +86,7 @@ const SpacesDashboard = ({ spaceId }) => {
   const { user } = useContext(UserContext);
   const spaceName = user ? user.space_name : 'Default';
   console.log("Space name: " + spaceName);
+  const { anomalies, setSpaceAnomaly, setRoomAnomaly } = useAnomaly();
 
   useEffect(() => {
     getSpaces(); 
@@ -119,27 +124,63 @@ const SpacesDashboard = ({ spaceId }) => {
     // navigate(`/spaces/${space_id}/rules`); if you want to navigate to rules
   };
   
+  useEffect(() => {
+    const handleAnomalyUpdate = (anomalyData) => {
+        console.log("SpacesDashboard received complete anomaly data:", anomalyData);
+        console.log("Image data present in SpacesDashboard:", !!anomalyData.image);
+        
+        // Update space anomaly
+        if (anomalyData.spaceId) {
+            setSpaceAnomaly(anomalyData.spaceId, {
+                ...anomalyData,
+                hasAnomaly: true
+            });
+        }
+        
+        // Also update room anomaly
+        if (anomalyData.roomId) {
+            setRoomAnomaly(anomalyData.roomId, {
+                ...anomalyData,
+                hasAnomaly: true
+            });
+        }
+    };
+
+    eventEmitter.on('anomalyUpdate', handleAnomalyUpdate);
+    return () => eventEmitter.off('anomalyUpdate', handleAnomalyUpdate);
+  }, [setSpaceAnomaly, setRoomAnomaly]);
 
   return (
     <div className={classes.Row}>
       <SpacesSection>
-          {spaces.map((space,index) => (
-            <div
-              data-test={`room-card-${space.space_id}`}
-              key={space.space_id || index}
-              className={classes.Column}
-              onClick={() => onClickRoomHandler(space.space_id)}
+          {spaces.map((space, index) => {
+            console.log("Space ID:", space.space_id, "Anomalies:", anomalies);
+            return (
+              <div
+                data-test={`room-card-${space.space_id}`}
+                key={space.space_id || index}
+                className={classes.Column}
+                onClick={() => onClickRoomHandler(space.space_id)}
               >
-              <Space
+                {anomalies.spaces[space.space_id]?.hasAnomaly && (
+                  <div className={classes.anomalyIndicator}>
+                    <FontAwesomeIcon
+                      icon={faLightbulb}
+                      className={classes.flickeringIcon}
+                    />
+                  </div>
+                )}
+                <Space
                   id={space.space_id}
                   space_name={space.space_name}
-                  type={space.type} // Assuming name is a property of the room object
-                  icon={iconMapping[space.icon]} // Assuming icon is a property of the room object
+                  type={space.type}
+                  icon={iconMapping[space.icon]}
                   city={space.city}
                   rasp_ip={space.rasp_ip}
-              />
+                />
               </div>
-          ))}
+            );
+          })}
           <NewSpaceItem>
               <NewSpace setIsModalOpen={setIsModalOpen} />
           </NewSpaceItem>

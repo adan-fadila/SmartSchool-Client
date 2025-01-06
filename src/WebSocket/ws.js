@@ -4,11 +4,14 @@ export const eventEmitter = new EventEmitter();
 
 let tempws;
 if (window.location.protocol === "https:") {
-    tempws = new WebSocket('wss://software.shenkar.cloud:8080');
+    //tempws = new WebSocket('wss://software.shenkar.cloud:8080'); // for production    
+    tempws = new WebSocket('ws://localhost:8002'); // for development
 } else {
-    tempws= new WebSocket('ws://software.shenkar.cloud:8001');
+    //tempws = new WebSocket('ws://software.shenkar.cloud:8001'); // for production
+    tempws = new WebSocket('ws://localhost:8002'); // for development
 }
 export const ws = tempws;
+
 ws.addEventListener('open', () => {
     console.log('connected');
 });
@@ -17,27 +20,22 @@ ws.addEventListener('error', (error) => {
     console.error('WebSocket error:', error);
 });
 
-
 ws.addEventListener('message', (event) => {
     try {
         const message = JSON.parse(event.data);
-        console.log("WebSocket message received:", message);
+        console.log("Complete WebSocket message:", message);
 
-        if (message.motionDetected) {
-            console.log("Emitting 'motionDetected' event with roomId:", message.roomId);
-            eventEmitter.emit('motionDetected', message.roomId);
-        }
+        if (message.type === 'anomaly_update') {
+            console.log("Processing anomaly update with data:", message.data);
 
-        // Add the following to handle pump state changes
-        if ('pumpState' in message) {
-            if (message.pumpState) {
-                eventEmitter.emit('pumpStateChange', true);
-            } else {
-                eventEmitter.emit('pumpStateChange', false);
-            }
+            eventEmitter.emit('anomalyUpdate', {
+                ...message.data,
+                plotImage: message.data.plot_image,
+                collectivePlot: message.data.collective_plot,
+                anomalies: message.data.anomalies
+            });
         }
     } catch (error) {
-        console.log('Received non-JSON message:', event.data);
+        console.error('Error processing WebSocket message:', error);
     }
 });
-

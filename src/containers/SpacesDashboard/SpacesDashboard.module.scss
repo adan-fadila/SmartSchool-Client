@@ -12,6 +12,7 @@
   width: 50%;
   padding: 10px;
   box-sizing: border-box;
+  position: relative;
 
   @include mobile-view {
     width: 100%;
@@ -20,4 +21,23 @@
 
 .Link {
   text-decoration: none;
+}
+
+.anomalyIndicator {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 2;
+}
+
+@keyframes flicker {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+.flickeringIcon {
+  animation: flicker 1s infinite;
+  font-size: 2rem;
+  color: #ff9800;
 }

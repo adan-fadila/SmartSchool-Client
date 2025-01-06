@@ -19,6 +19,7 @@ import AuthContext, { AuthProvider } from "./contexts/AuthContext";
 import { getSuggestions } from "./components/Suggestions/suggestions.service";
 import UserContext from "./contexts/UserContext";
 import CalendarDashboard from "./containers/CalendarDashboard/CalendarDashboard";
+import { AnomalyProvider } from './contexts/AnomalyContext';
 
 
 const App = () => {
@@ -34,14 +35,16 @@ const App = () => {
   }, []);
 
   return (
-    <AuthProvider>
-      <AppContent
-        newSuggestionsCount={newSuggestionsCount}
-        setNewSuggestionsCount={setNewSuggestionsCount}
-        isHouseMapVisible={isHouseMapVisible}
-        setIsHouseMapVisible={setIsHouseMapVisible}
-      />
-    </AuthProvider>
+    <AnomalyProvider>
+      <AuthProvider>
+        <AppContent
+          newSuggestionsCount={newSuggestionsCount}
+          setNewSuggestionsCount={setNewSuggestionsCount}
+          isHouseMapVisible={isHouseMapVisible}
+          setIsHouseMapVisible={setIsHouseMapVisible}
+        />
+      </AuthProvider>
+    </AnomalyProvider>
   );
 };
 
