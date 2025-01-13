@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useContext, useState } from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
 import RoomsDashboard from "./containers/RoomsDashboard/RoomsDashboard";
 import SpacesDashboard from "./containers/SpacesDashboard/SpacesDashboard";
@@ -20,40 +20,31 @@ import { getSuggestions } from "./components/Suggestions/suggestions.service";
 import UserContext from "./contexts/UserContext";
 import CalendarDashboard from "./containers/CalendarDashboard/CalendarDashboard";
 import { AnomalyProvider } from './contexts/AnomalyContext';
+import { SuggestionsProvider, useSuggestions } from './contexts/SuggestionsContext';
 
 
 const App = () => {
-  const [newSuggestionsCount, setNewSuggestionsCount] = useState(0);
   const [isHouseMapVisible, setIsHouseMapVisible] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const suggestions = await getSuggestions();
-      const newSuggestions = suggestions.filter(({ is_new }) => is_new);
-      setNewSuggestionsCount(newSuggestions.length);
-    })();
-  }, []);
 
   return (
     <AnomalyProvider>
-      <AuthProvider>
-        <AppContent
-          newSuggestionsCount={newSuggestionsCount}
-          setNewSuggestionsCount={setNewSuggestionsCount}
-          isHouseMapVisible={isHouseMapVisible}
-          setIsHouseMapVisible={setIsHouseMapVisible}
-        />
-      </AuthProvider>
+      <SuggestionsProvider>
+        <AuthProvider>
+          <AppContent
+            isHouseMapVisible={isHouseMapVisible}
+            setIsHouseMapVisible={setIsHouseMapVisible}
+          />
+        </AuthProvider>
+      </SuggestionsProvider>
     </AnomalyProvider>
   );
 };
 
 const AppContent = ({
-  newSuggestionsCount,
-  setNewSuggestionsCount,
   isHouseMapVisible,
   setIsHouseMapVisible
 }) => {
+  const { suggestions, newSuggestionsCount, setNewSuggestionsCount } = useSuggestions();
   const { isAuthenticated, user, setUser, handleSignIn, handleLogout } = useContext(AuthContext);
 
   return (

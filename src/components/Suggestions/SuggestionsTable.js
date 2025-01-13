@@ -2,7 +2,7 @@ import { Button, Tooltip } from "@mui/material";
 import Modal from "react-modal";
 import Pagination from "@mui/material/Pagination";
 import React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   addSuggestedRule,
   getSuggestions,
@@ -36,17 +36,23 @@ import ChooseRoomModal from "./ChooseRoomModal";
 import axios from "axios";
 import { eventEmitter } from "../../WebSocket/ws";
 import ICE from '../../assets/IEC2.png'; 
+import { useSuggestions } from '../../contexts/SuggestionsContext';
 
 const itemsPerPage = 7; // Define how many items you want per page
-export const SuggestionsTable = ({ setNewSuggestionsCount }) => {
-  const [suggestions, setSuggestions] = useState([]);
+export const SuggestionsTable = () => {
+  const { 
+    suggestions, 
+    setSuggestions, 
+    newSuggestionsCount, 
+    setNewSuggestionsCount,
+    removeSuggestion 
+  } = useSuggestions();
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRule, setSelectedRule] = useState(null);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
   const [isClickable, setIsClickable] = useState(true);
   const [isChooseRoomModalOpen, setIsChooseRoomModalOpen] = useState(false);
-
-
 
   // for making rules clickable only on tablet
   useEffect(() => {
@@ -77,36 +83,12 @@ export const SuggestionsTable = ({ setNewSuggestionsCount }) => {
     const response = axios.post(`${SERVER_URL}/api-suggestion/test`);
   }
 
-
-
-
-
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get(`${SERVER_URL}/api/recommendations`);
-        // Transform recommendations to match the suggestions format
-        const transformedSuggestions = response.data.map((rec, index) => ({
-          id: index,
-          device: rec.device,
-          normalized_rule: `Turn ${rec.recommendation} during ${rec.recommended_time}`,
-          is_new: true // You can adjust this logic as needed
-        }));
-        setSuggestions(transformedSuggestions);
-      } catch (error) {
-        console.error('Error fetching recommendations:', error);
-      }
-    };
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    setNewSuggestionsCount(0); // Assuming this is intended to reset some state
-    if (suggestions) {
-      updateSuggestions();
-    }
-  }, [suggestions, setNewSuggestionsCount]); 
+  // Debug effect for suggestions changes
+  //useEffect(() => {
+    //console.log("Suggestions state changed:", suggestions);
+    //console.log("Current suggestions length:", suggestions.length);
+    //console.log("First suggestion:", suggestions[0]);
+  //}, [suggestions]);
 
   // Function to handle page change
   const handlePageChange = (event, value) => {
@@ -114,79 +96,91 @@ export const SuggestionsTable = ({ setNewSuggestionsCount }) => {
   };
 
   // Calculate the suggestions for the current page
-  const suggestionsOnPage = suggestions.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const suggestionsOnPage = useMemo(() => {
+    console.log("Calculating suggestions for page", currentPage);
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const page = suggestions.slice(start, end);
+    console.log("Suggestions on current page:", page);
+    return page;
+  }, [suggestions, currentPage]);
+
+  //console.log("Rendering suggestions on page:", suggestionsOnPage);
+
+  const handleDelete = (suggestionId) => {
+    console.log('Deleting suggestion with ID:', suggestionId);
+    removeSuggestion(suggestionId);
+  };
+
+  const handleAdd = (rule, suggestionId) => {
+    setIsChooseRoomModalOpen(true);
+    setSelectedRule(rule);
+    // The actual deletion will happen after successful addition in ChooseRoomModal
+  };
 
   return (
     <TableContainer>
-      <TitleStyled2>Recommendations</TitleStyled2>
+      <TitleStyled2>Recommendations ({suggestions.length})</TitleStyled2>
       <TableStyled>
         <thead>
           <tr>
-             <ThStyled>User</ThStyled>
+            <ThStyled>User</ThStyled>
             <ThStyled>Device</ThStyled>
             <ThStyled>Recommended Action</ThStyled>
             <ThStyled>Actions</ThStyled>
           </tr>
         </thead>
         <tbody>
-          {suggestionsOnPage.map((suggestion, idx) => {
-            const rule = suggestion.normalized_rule;
-            const { is_new: isNew } = suggestion;
-            return (
-              <tr key={idx}>
-                <TdStyled>
-                    < img src={ICE} alt={"ICE"} height={'40px'}/>
-                </TdStyled>
-                <TdStyled>
-                  <DeviceCellContent>
-                    {suggestion.device}
-                    {isNew && (
-                      <NewTag>
-                        <NewTagText>NEW!</NewTagText>
-                      </NewTag>
-                    )}
-                  </DeviceCellContent>
-                </TdStyled>
-                <TdStyled>
-                  <Tooltip title={rule}>
-                    <RuleCell onClick={handleRuleClick}>{rule}</RuleCell>
-                  </Tooltip>
-                </TdStyled>
-                <TdStyled>
-                  <ButtonStyled
-                    className="custom-button"
-                    onClick={() => {
-                      setIsChooseRoomModalOpen(true);
-                      setSelectedRule(rule);
-                      // onDeleteSuggestion(
-                      //   suggestion.id,
-                      //   suggestions,
-                      //   setSuggestions
-                      // )
+          {Array.isArray(suggestionsOnPage) && suggestionsOnPage.length > 0 ? (
+            suggestionsOnPage.map((suggestion, idx) => {
+              console.log("Rendering suggestion:", suggestion);
+              const rule = suggestion.normalized_rule;
+              const { is_new: isNew } = suggestion;
+              return (
+                <tr key={suggestion.id}>
+                  <TdStyled>
+                    <img src={ICE} alt={"ICE"} height={'40px'}/>
+                  </TdStyled>
+                  <TdStyled>
+                    <DeviceCellContent>
+                      {suggestion.device}
+                      {isNew && (
+                        <NewTag>
+                          <NewTagText>NEW!</NewTagText>
+                        </NewTag>
+                      )}
+                    </DeviceCellContent>
+                  </TdStyled>
+                  <TdStyled>
+                    <Tooltip title={rule}>
+                      <RuleCell onClick={() => handleRuleClick(rule)}>{rule}</RuleCell>
+                    </Tooltip>
+                  </TdStyled>
+                  <TdStyled>
+                    <ButtonStyled
+                      className="custom-button"
+                      onClick={() => {
+                        handleAdd(rule, suggestion.id);
+                      }
                     }
-                  }
-                  >
-                    <i className="fa fa-plus" aria-hidden="true"></i> Add
-                  </ButtonStyled>
-                  <ButtonStyled
-                    className="custom-button"
-                    // onClick={() =>
-                    //   onDeleteSuggestion(
-                    //     suggestion.id,
-                    //     suggestions,
-                    //     setSuggestions
-                    //   )
-                    // }
-                  >
-                    <i className="fa fa-trash" aria-hidden="true"></i> Delete
-                  </ButtonStyled>
-                </TdStyled>
-              </tr>
-            );
-          })}
+                    >
+                      <i className="fa fa-plus" aria-hidden="true"></i> Add
+                    </ButtonStyled>
+                    <ButtonStyled
+                      className="custom-button"
+                      onClick={() => handleDelete(suggestion.id)}
+                    >
+                      <i className="fa fa-trash" aria-hidden="true"></i> Delete
+                    </ButtonStyled>
+                  </TdStyled>
+                </tr>
+              );
+            })
+          ) : (
+            <tr>
+              <TdStyled colSpan={4}>No recommendations available</TdStyled>
+            </tr>
+          )}
         </tbody>
       </TableStyled>
       <PaginationContainer>

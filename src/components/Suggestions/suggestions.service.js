@@ -77,15 +77,15 @@ export const getSuggestions = async () => {
   
 
   export const onDeleteSuggestion = async (id, suggestions, setSuggestions) => {
-    try{
-      console.log('Deleting suggestion');
+    try {
+      console.log('Deleting suggestion with ID:', id);
       await axios.delete(`${SERVER_URL}/api-suggestion/suggestions/${id}`);
       const filteredSuggestions = suggestions.filter(suggestion => suggestion.id !== id);
       setSuggestions(filteredSuggestions);
-    }catch(error){
+    } catch (error) {
       console.error('Error deleting suggestion: ' + error.message);
     }
-  }
+  };
 
 
 
