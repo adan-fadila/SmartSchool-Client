@@ -48,17 +48,101 @@ const RulesTable = ({ rules, onRuleClick, selectedRule, fetchRules }) => {
 
   const handleSaveEdit = async (ruleId) => {
     try {
-      const response = await axios.put(`${SERVER_URL}/api-rule/rules/${ruleId}`, { description: editValue });
+      // Parse the edited rule text
+      const ruleParts = editValue.toLowerCase().split('then');
+      
+      if (ruleParts.length !== 2) {
+        toast.error('Rule must contain "then" to separate event and action');
+        return;
+      }
+      
+      // Extract event (remove 'if' at the beginning if present)
+      let event = ruleParts[0].trim();
+      if (event.startsWith('if ')) {
+        event = event.substring(3).trim();
+      }
+      
+      // Extract action
+      const action = ruleParts[1].trim();
+      
+      // Extract room name from the event part (new format: "if [room name] [sensor]")
+      let roomName = '';
+      
+      // Match pattern like: "living room temperature" or "bedroom motion"
+      const eventRoomRegex = /^(.*?)\s+(temperature|humidity|motion|light)/i;
+      const eventRoomMatch = event.match(eventRoomRegex);
+      
+      if (eventRoomMatch && eventRoomMatch[1]) {
+        roomName = eventRoomMatch[1].trim();
+      }
+      
+      if (!roomName) {
+        toast.error('Could not extract room name from the rule. Please use format: "if [room name] [sensor] then [room name] [device] [state]"');
+        return;
+      }
+      
+      // Verify that the same room name is used in the action part
+      const actionRoomRegex = new RegExp(roomName + '\\s+(ac|light|fan|heater|tv)', 'i');
+      const actionRoomMatch = action.match(actionRoomRegex);
+      
+      if (!actionRoomMatch) {
+        toast.error(`Room name "${roomName}" from event part must also be used in action part. Please use format: "if ${roomName} [sensor] then ${roomName} [device] [state]"`);
+        return;
+      }
+      
+      // Find the room ID based on the room name
+      const rule = currentRules.find(r => r.id === ruleId);
+      let roomId = null;
+      
+      try {
+        const roomResponse = await axios.get(`${SERVER_URL}/api-room/rooms/space/${rule.space_id || spaceId}`);
+        if (roomResponse.status === 200) {
+          const roomsData = roomResponse.data;
+          const room = roomsData.find(r => r.name.toLowerCase() === roomName.toLowerCase());
+          
+          if (room) {
+            roomId = room.id;
+          } else {
+            toast.error(`Room "${roomName}" not found`);
+            return;
+          }
+        } else {
+          throw new Error(`HTTP error! status: ${roomResponse.status}`);
+        }
+      } catch (error) {
+        console.error('Failed to fetch room ID:', error);
+        toast.error(`Failed to fetch room ID: ${error.message}`);
+        return;
+      }
+
+      // Prepare the updated rule data
+      const updatedRuleData = {
+        description: editValue,
+        event: event,
+        action: action,
+        room_id: roomId
+      };
+
+      const response = await axios.put(`${SERVER_URL}/api-rule/rules/${ruleId}`, updatedRuleData);
       if (response.status === 200) {
         toast.success("Rule updated successfully!");
-        const updatedRules = currentRules.map(rule => rule.id === ruleId ? { ...rule, description: editValue } : rule);
+        const updatedRules = currentRules.map(rule => 
+          rule.id === ruleId ? { 
+            ...rule, 
+            description: editValue,
+            event: event,
+            action: action,
+            room_id: roomId
+          } : rule
+        );
         setCurrentRules(updatedRules);
         setEditRuleId(null);
       } else {
         toast.error("Failed to update rule.");
       }
     } catch (error) {
-      toast.error("Failed to update rule.");
+      console.error("Error updating rule:", error);
+      toast.error(`Failed to update rule: ${error.message}`);
     }
   };
 
@@ -98,6 +182,7 @@ const RulesTable = ({ rules, onRuleClick, selectedRule, fetchRules }) => {
   };
 
   const handleAddRuleSuccess = async () => {
+    console.log('handleAddRuleSuccess called - closing modal');
     setOpenAddRuleModal(false);
     await fetchRules(); // Refresh the rules list after adding a new rule
   };
@@ -114,7 +199,8 @@ const RulesTable = ({ rules, onRuleClick, selectedRule, fetchRules }) => {
           <AddRuleComponent 
             spaceId={spaceId} 
             fullName={fullName} 
-            onSuccess={handleAddRuleSuccess} 
+            onSuccess={handleAddRuleSuccess}
+            closeModal={handleCloseAddRuleModal}
           />
         </RulesModal>
       </div>

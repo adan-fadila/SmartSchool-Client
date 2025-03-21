@@ -2,57 +2,14 @@ import React, { useState, useEffect } from 'react';
 import classes from './AddRuleComponent.module.scss';
 import { toast } from 'react-toastify';
 import { SERVER_URL } from '../../consts';
-import { getGreeting_rule } from '../../utils/utils';
-
-const predefinedActivities = ["Studying", "Sleeping", "watching_tv", "Eating", "Cooking", "Playing", "Outside"];
-const predefinedSeasons = ["Spring", "Summer", "Fall", "Winter"];
-const conditionKeywords = ["in", "not in"];
-const conditionTypes = ["motion", "temperature", "time", "eventType"];
-const timePeriods = ["morning", "afternoon", "evening", "night"];
-const operators = ["and", "or"];
 
 const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
-  const greeting = getGreeting_rule();
-  const [conditionType, setConditionType] = useState('motion');
-  const [person, setPerson] = useState(fullName);
-  const [conditionKeyword, setConditionKeyword] = useState('in');
-  const [conditionKeywords, setConditionKeywords] = useState(['in', 'not in']);
-
-  const [roomName, setRoomName] = useState('');
-  const [activity, setActivity] = useState('');
-  const [season, setSeason] = useState('');
-  const [acTemperature, setAcTemperature] = useState(25);
-  const [acMode, setAcMode] = useState('cool');
-  const [acState, setAcState] = useState('on');
-  const [lightState, setLightState] = useState('on');
+  const [ruleText, setRuleText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rooms, setRooms] = useState([]);
-  const [devices, setDevices] = useState([]);
-  const [selectedDevices, setSelectedDevices] = useState({});
-  const [temperatureCondition, setTemperatureCondition] = useState('is above');
-  const [temperatureValue, setTemperatureValue] = useState(25);
-  const [humidityCondition, setHumidityCondition] = useState('is above');
-  const [humidityValue, setHumidityValue] = useState(50);
-  const [timePeriod, setTimePeriod] = useState(greeting);
-  const [operatorBefore, setOperatorBefore] = useState('and');
-  const [operatorAfter, setOperatorAfter] = useState('and');
-  const [includeHumidity, setIncludeHumidity] = useState(false);
-  const [includeTemperature, setIncludeTemperature] = useState(true);
-  const [eventType, setEventType] = useState('');
-  const [includeActivity, setIncludeActivity] = useState(false);
 
   useEffect(() => {
-    if (conditionType === 'eventType') {
-      setConditionKeywords(['start', 'end']);
-      setConditionKeyword('start');
-    } else {
-      setConditionKeywords(['in', 'not in']);
-      setConditionKeyword('in');
-    }
-  }, [conditionType]);
-
-  useEffect(() => {
-    let isMounted = true; // Track if the component is mounted
+    let isMounted = true;
 
     const fetchRooms = async () => {
       try {
@@ -60,8 +17,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         if (response.ok) {
           const data = await response.json();
           if (isMounted) {
-            const roomNames = data.map(room => room.name);
-            setRooms(roomNames);
+            setRooms(data);
           }
         } else {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -77,98 +33,68 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
     fetchRooms();
 
     return () => {
-      isMounted = false; // Cleanup function to set isMounted to false
+      isMounted = false;
     };
   }, [spaceId]);
 
-  useEffect(() => {
-    let isMounted = true; // Track if the component is mounted
-
-    const fetchDevices = async () => {
-      if (roomName) {
-        try {
-          const response = await fetch(`${SERVER_URL}/api-device/device/space/${spaceId}/${encodeURIComponent(roomName)}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (isMounted) {
-              setDevices(data);
-            }
-          } else {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-        } catch (error) {
-          console.error('Failed to fetch devices:', error);
-          if (isMounted) {
-            toast.error(`Failed to fetch devices. ${error.message}`);
-          }
-        }
-      }
-    };
-
-    fetchDevices();
-
-    return () => {
-      isMounted = false; // Cleanup function to set isMounted to false
-    };
-  }, [roomName, spaceId]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
-    const controlVariables = Object.entries(selectedDevices).reduce((acc, [device, state]) => {
-      if (device.includes('AC')) {
-        acc[device] = {
-          state: acState,
-          temperature: acTemperature,
-          mode: acMode
-        };
-      } else {
-        acc[device] = state;
-      }
-      return acc;
-    }, {});
-
-    const thenActions = Object.entries(selectedDevices).map(([device, state]) => {
-      if (device.includes('AC')) {
-        return `turn ${device} ${acMode} mode ${acTemperature} ${acState}`;
-      } else {
-        return `turn ${device} ${state}`;
-      }
-    }).join(' and ');
-
-    let condition = '';
-    if (conditionType === 'motion') {
-      condition = `If ${person} ${conditionKeyword} ${roomName}`;
-      if (conditionKeyword === 'in' && roomName !== 'bathroom' && includeActivity) {
-        condition += ` ${operatorBefore} ${activity}`;
-      }
-      if (conditionKeyword === 'in' && roomName !== 'bathroom') {
-        condition += ` ${operatorAfter} season is ${season}`;
-      }
-    } else if (conditionType === 'temperature') {
-      if (includeTemperature && includeHumidity) {
-        condition = `If temperature in ${roomName} ${temperatureCondition} ${temperatureValue} ${operatorBefore} humidity ${humidityCondition} ${humidityValue}`;
-      } else if (includeTemperature) {
-        condition = `If temperature in ${roomName} ${temperatureCondition} ${temperatureValue}`;
-      } else if (includeHumidity) {
-        condition = `If humidity in ${roomName} ${humidityCondition} ${humidityValue}`;
-      }
-    } else if (conditionType === 'time') {
-      condition = `If hour ${conditionKeyword} ${roomName} is ${timePeriod} ${operatorBefore} temperature ${temperatureCondition} ${temperatureValue}`;
-    } else if (conditionType === 'eventType') {
-      condition = `If ${conditionKeyword} ${eventType} in ${roomName}${
-        conditionKeyword === 'start' ? ` ${operatorBefore} season is ${season}` : ''
-      }`;
+    
+    // Validate that the rule text is not empty
+    if (!ruleText.trim()) {
+      toast.error('Please enter a rule');
+      return;
     }
-
+    
+    // Parse the rule text
+    const ruleLower = ruleText.toLowerCase();
+    if (!ruleLower.startsWith('if ') || !ruleLower.includes(' then ')) {
+      toast.error('Rule must follow the format: "if [condition] then [action]"');
+      return;
+    }
+    
+    // Extract parts
+    const parts = ruleLower.split(' then ');
+    let condition = parts[0].substring(3).trim(); // Remove 'if ' from the start
+    const action = parts[1].trim();
+    
+    // Extract room name from condition (e.g., "living room temperature > 10")
+    const conditionParts = condition.split(' ');
+    let roomName = '';
+    
+    // Try to identify the room name from the condition
+    for (let i = 0; i < rooms.length; i++) {
+      const room = rooms[i].name.toLowerCase();
+      if (condition.includes(room)) {
+        roomName = room;
+        break;
+      }
+    }
+    
+    if (!roomName) {
+      toast.error('Could not identify a valid room name in the condition');
+      return;
+    }
+    
+    // Find room ID
+    const room = rooms.find(r => r.name.toLowerCase() === roomName);
+    if (!room) {
+      toast.error(`Room "${roomName}" not found`);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    // Prepare the rule data
     const ruleData = {
-      description: condition + ` then ${thenActions}`,
-      condition: condition,
-      control: controlVariables,
-      space_id: spaceId
+      description: ruleText,
+      event: condition,
+      action: action,
+      room_id: room.id,
+      space_id: spaceId,
+      created_by: fullName || 'User'
     };
-
+    
     try {
       const response = await fetch(`${SERVER_URL}/api-rule/rules`, {
         method: 'POST',
@@ -177,521 +103,60 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         },
         body: JSON.stringify(ruleData),
       });
-
-      const contentType = response.headers.get('content-type');
-
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        console.log(data);
+      
+      if (response.ok) {
         toast.success('Rule added successfully!');
+        setRuleText('');
+        if (onSuccess) onSuccess();
       } else {
-        const textResponse = await response.text();
-        console.log(textResponse);
-        if (response.ok) {
-          toast.success(textResponse);
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}, ${textResponse}`);
-        }
+        const errorData = await response.text();
+        throw new Error(errorData || 'Failed to add rule');
       }
-
-      if (onSuccess) onSuccess();
     } catch (error) {
       console.error('There was an error!', error);
       toast.error(`Failed to add the rule. ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
-  };
-
-  const handleDeviceSelectionChange = (device) => {
-    setSelectedDevices(prevState => {
-      if (prevState[device]) {
-        const newState = { ...prevState };
-        delete newState[device];
-        return newState;
-      } else {
-        return { ...prevState, [device]: 'on' };
-      }
-    });
-  };
-
-  const handleDeviceStateChange = (device, state) => {
-    setSelectedDevices(prevState => ({
-      ...prevState,
-      [device]: state
-    }));
   };
 
   return (
-    <form onSubmit={handleSubmit} className={classes.formContainer}>
-      <h3 className={classes.sectionTitle}>Condition Variable</h3>
-      <div className={classes.formRow}>
-        <label htmlFor="conditionTypeSelector" className={classes.labelColumn}>Condition Type:</label>
-        <select
-          id="conditionTypeSelector"
-          name="conditionTypeSelector"
-          value={conditionType}
-          onChange={(e) => setConditionType(e.target.value)}
-          required
-          className={classes.inputColumn}
-        >
-          {conditionTypes.map((type, index) => (
-            <option key={index} value={type}>{type}</option>
-          ))}
-        </select>
-      </div>
-
-      {conditionType === 'motion' && (
-        <>
-          <div className={classes.formRow}>
-            <label htmlFor="personSelector" className={classes.labelColumn}>Motion:</label>
-            <input
-              id="personSelector"
-              name="personSelector"
-              value={person}
-              onChange={(e) => setPerson(e.target.value)}
-              required
-              className={classes.inputColumn}
-              placeholder="Enter Motion name"
-            />
-          </div>
-          <div className={classes.formRow}>
-            <label htmlFor="includeActivity" className={classes.labelColumn}>Include Activity:</label>
-            <input
-              id="includeActivity"
-              name="includeActivity"
-              type="checkbox"
-              checked={includeActivity}
-              onChange={(e) => setIncludeActivity(e.target.checked)}
-              className={classes.inputColumn}
-            />
-          </div>
-        </>
-      )}
-
-      {conditionType === 'eventType' && (
-        <div className={classes.formRow}>
-          <label htmlFor="eventTypeInput" className={classes.labelColumn}>Event Type:</label>
-          <input
-            id="eventTypeInput"
-            name="eventTypeInput"
-            value={eventType}
-            onChange={(e) => setEventType(e.target.value)}
-            required
-            className={classes.inputColumn}
-            placeholder="Enter event type"
+    <div className={classes.formContainer}>
+      <form onSubmit={handleSubmit}>
+        <div className={classes.textInputContainer}>
+          <label htmlFor="ruleInput" className={classes.ruleLabel}>
+            Enter your rule:
+          </label>
+          <textarea
+            id="ruleInput"
+            className={classes.ruleTextArea}
+            value={ruleText}
+            onChange={(e) => setRuleText(e.target.value)}
+            placeholder="if [room name] [condition] then [room name] [action]"
+            rows={4}
           />
+          <div className={classes.hint}>
+            <p>Format examples:</p>
+            <p>- if Living Room Temperature {'>'} 26 then Living Room AC on</p>
+            <p>- if Living Room Temperature {'>'} 10 then Living Room AC on 20 heat</p>
+            <p>- if Kitchen Motion detected then Kitchen Light on</p>
+          </div>
         </div>
-      )}
-
-      {(conditionType === 'motion' || conditionType === 'eventType' || conditionType === 'time' || conditionType === 'temperature') && (
-        <div className={classes.formRow}>
-          <label htmlFor="conditionKeywordSelector" className={classes.labelColumn}>Condition Keyword:</label>
-          <select
-            id="conditionKeywordSelector"
-            name="conditionKeywordSelector"
-            value={conditionKeyword}
-            onChange={(e) => setConditionKeyword(e.target.value)}
-            required
-            className={classes.inputColumn}
-          >
-            <option value="">Select Condition</option>
-            {conditionKeywords.map((keyword, index) => (
-              <option key={index} value={keyword}>{keyword}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div className={classes.formRow}>
-        <label htmlFor="locationSelector" className={classes.labelColumn}>Room Name:</label>
-        <select
-          id="locationSelector"
-          name="locationSelector"
-          value={roomName}
-          onChange={(e) => setRoomName(e.target.value)}
-          required
-          className={classes.inputColumn}
+        <button
+          type="submit"
+          className={classes.submitButton}
+          disabled={isSubmitting}
         >
-          <option value="">Select Room</option>
-          {rooms.map((room, index) => (
-            <option key={index} value={room}>{room}</option>
-          ))}
-        </select>
-      </div>
-
-      {conditionType === 'temperature' && (
-        <>
-          <div className={classes.formRow}>
-            <label htmlFor="includeTemperature" className={classes.labelColumn}>Include Temperature:</label>
-            <input
-              id="includeTemperature"
-              name="includeTemperature"
-              type="checkbox"
-              checked={includeTemperature}
-              onChange={(e) => setIncludeTemperature(e.target.checked)}
-              className={classes.inputColumn}
-            />
-          </div>
-
-          {includeTemperature && (
-            <>
-              <div className={classes.formRow}>
-                <label htmlFor="temperatureConditionSelector" className={classes.labelColumn}>Temperature Condition:</label>
-                <select
-                  id="temperatureConditionSelector"
-                  name="temperatureConditionSelector"
-                  value={temperatureCondition}
-                  onChange={(e) => setTemperatureCondition(e.target.value)}
-                  required
-                  className={classes.inputColumn}
-                >
-                  <option value="is above">Is Above</option>
-                  <option value="is equal to">Is Equal to</option>
-                  <option value="is below">Is Below</option>
-                  <option value="is less">Is Less</option>
-                </select>
-              </div>
-
-              <div className={classes.formRow}>
-                <label htmlFor="temperatureValue" className={classes.labelColumn}>Temperature (°C):</label>
-                <input
-                  id="temperatureValue"
-                  name="temperatureValue"
-                  type="number"
-                  value={temperatureValue}
-                  onChange={(e) => setTemperatureValue(parseInt(e.target.value, 10))}
-                  required
-                  className={classes.inputColumn}
-                  min="0"
-                />
-              </div>
-            </>
-          )}
-
-          <div className={classes.formRow}>
-            <label htmlFor="includeHumidity" className={classes.labelColumn}>Include Humidity:</label>
-            <input
-              id="includeHumidity"
-              name="includeHumidity"
-              type="checkbox"
-              checked={includeHumidity}
-              onChange={(e) => setIncludeHumidity(e.target.checked)}
-              className={classes.inputColumn}
-            />
-          </div>
-
-          {includeHumidity && (
-            <>
-              {includeTemperature && (
-                <div className={classes.formRow}>
-                  <label htmlFor="operatorBeforeHumiditySelector" className={classes.labelColumn}>Operator Before Humidity Condition:</label>
-                  <select
-                    id="operatorBeforeHumiditySelector"
-                    name="operatorBeforeHumiditySelector"
-                    value={operatorBefore}
-                    onChange={(e) => setOperatorBefore(e.target.value)}
-                    required
-                    className={classes.inputColumn}
-                  >
-                    {operators.map((op, index) => (
-                      <option key={index} value={op}>{op}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className={classes.formRow}>
-                <label htmlFor="humidityConditionSelector" className={classes.labelColumn}>Humidity Condition:</label>
-                <select
-                  id="humidityConditionSelector"
-                  name="humidityConditionSelector"
-                  value={humidityCondition}
-                  onChange={(e) => setHumidityCondition(e.target.value)}
-                  required
-                  className={classes.inputColumn}
-                >
-                  <option value="is above">Is Above</option>
-                  <option value="is equal to">Is Equal to</option>
-                  <option value="is below">Is Below</option>
-                  <option value="is less">Is Less</option>
-                </select>
-              </div>
-
-              <div className={classes.formRow}>
-                <label htmlFor="humidityValue" className={classes.labelColumn}>Humidity (%):</label>
-                <input
-                  id="humidityValue"
-                  name="humidityValue"
-                  type="number"
-                  value={humidityValue}
-                  onChange={(e) => setHumidityValue(parseInt(e.target.value, 10))}
-                  required
-                  className={classes.inputColumn}
-                  min="0"
-                  max="100"
-                />
-              </div>
-            </>
-          )}
-        </>
-      )}
-
-      {conditionType === 'time' && (
-        <>
-          <div className={classes.formRow}>
-            <label htmlFor="timePeriodSelector" className={classes.labelColumn}>Time Period:</label>
-            <select
-              id="timePeriodSelector"
-              name="timePeriodSelector"
-              value={timePeriod}
-              onChange={(e) => setTimePeriod(e.target.value)}
-              required
-              className={classes.inputColumn}
-            >
-              <option value="">Select Time Period</option>
-              {timePeriods.map((period, index) => (
-                <option key={index} value={period}>{period}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className={classes.formRow}>
-            <label htmlFor="operatorBeforeSelector" className={classes.labelColumn}>Operator Before Temperature Condition:</label>
-            <select
-              id="operatorBeforeSelector"
-              name="operatorBeforeSelector"
-              value={operatorBefore}
-              onChange={(e) => setOperatorBefore(e.target.value)}
-              required
-              className={classes.inputColumn}
-            >
-              {operators.map((op, index) => (
-                <option key={index} value={op}>{op}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className={classes.formRow}>
-            <label htmlFor="temperatureConditionSelector" className={classes.labelColumn}>Temperature Condition:</label>
-            <select
-              id="temperatureConditionSelector"
-              name="temperatureConditionSelector"
-              value={temperatureCondition}
-              onChange={(e) => setTemperatureCondition(e.target.value)}
-              required
-              className={classes.inputColumn}
-            >
-              <option value="is above">Is Above</option>
-              <option value="is equal to">Is Equal to</option>
-              <option value="is below">Is Below</option>
-              <option value="is less">Is Less</option>
-            </select>
-          </div>
-
-          <div className={classes.formRow}>
-            <label htmlFor="temperatureValue" className={classes.labelColumn}>Temperature (°C):</label>
-            <input
-              id="temperatureValue"
-              name="temperatureValue"
-              type="number"
-              value={temperatureValue}
-              onChange={(e) => setTemperatureValue(parseInt(e.target.value, 10))}
-              required
-              className={classes.inputColumn}
-              min="0"
-            />
-          </div>
-        </>
-      )}
-
-      {((conditionKeyword === 'in' && roomName !== 'bathroom') || (conditionKeyword === 'start' && (conditionType === 'motion' || conditionType === 'eventType'))) && (
-        <>
-          {conditionType === 'motion' && includeActivity && (
-            <>
-              <div className={classes.formRow}>
-                <label htmlFor="operatorBeforeSelector" className={classes.labelColumn}>Operator Before Activity:</label>
-                <select
-                  id="operatorBeforeSelector"
-                  name="operatorBeforeSelector"
-                  value={operatorBefore}
-                  onChange={(e) => setOperatorBefore(e.target.value)}
-                  required
-                  className={classes.inputColumn}
-                >
-                  {operators.map((op, index) => (
-                    <option key={index} value={op}>{op}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className={classes.formRow}>
-                <label htmlFor="activitySelector" className={classes.labelColumn}>Activity:</label>
-                <select
-                  id="activitySelector"
-                  name="activitySelector"
-                  value={activity}
-                  onChange={(e) => setActivity(e.target.value)}
-                  required
-                  className={classes.inputColumn}
-                >
-                  <option value="">Select Activity</option>
-                  {predefinedActivities.map((activity, index) => (
-                    <option key={index} value={activity}>{activity}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-
-          {(conditionType === 'motion' || conditionType === 'eventType') && (
-            <>
-              <div className={classes.formRow}>
-                <label htmlFor="operatorBeforeSelector" className={classes.labelColumn}>Operator Before Season:</label>
-                <select
-                  id="operatorBeforeSelector"
-                  name="operatorBeforeSelector"
-                  value={operatorBefore}
-                  onChange={(e) => setOperatorBefore(e.target.value)}
-                  required
-                  className={classes.inputColumn}
-                >
-                  {operators.map((op, index) => (
-                    <option key={index} value={op}>{op}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className={classes.formRow}>
-                <label htmlFor="seasonSelector" className={classes.labelColumn}>Season:</label>
-                <select
-                  id="seasonSelector"
-                  name="seasonSelector"
-                  value={season}
-                  onChange={(e) => setSeason(e.target.value)}
-                  required
-                  className={classes.inputColumn}
-                >
-                  <option value="">Select Season</option>
-                  {predefinedSeasons.map((season, index) => (
-                    <option key={index} value={season}>{season}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-        </>
-      )}
-
-      <h3 className={classes.sectionTitle}>Control Variable</h3>
-
-      <div className={classes.deviceRow}>
-        {devices.map((device, index) => (
-          <div key={index} className={classes.deviceCheckbox}>
-            <label htmlFor={`device_${device}`} className={classes.deviceLabel}>
-              <input
-                type="checkbox"
-                id={`device_${device}`}
-                name={`device_${device}`}
-                value={device}
-                onChange={() => handleDeviceSelectionChange(device)}
-              />
-              {device}
-            </label>
-          </div>
-        ))}
-      </div>
-
-      {Object.keys(selectedDevices).includes('AC') && (
-        <>
-          <div className={classes.formRow}>
-            <label htmlFor="acTemperatureSelector" className={classes.labelColumn}>AC Temperature (°C):</label>
-            <select
-              id="acTemperatureSelector"
-              name="acTemperatureSelector"
-              value={acTemperature}
-              onChange={(e) => setAcTemperature(parseInt(e.target.value, 10))}
-              required
-              className={classes.inputColumn}
-              aria-label="Select AC temperature"
-            >
-              <option value="">Select Temperature</option>
-              {Array.from({ length: 17 }, (_, i) => 16 + i).map(temp => (
-                <option key={temp} value={temp}>{temp}°C</option>
-              ))}
-            </select>
-          </div>
-
-          <div className={classes.formRow}>
-            <label htmlFor="acMode" className={classes.labelColumn}>AC Mode:</label>
-            <select
-              id="acMode"
-              name="acMode"
-              value={acMode}
-              onChange={(e) => setAcMode(e.target.value)}
-              required
-              className={classes.inputColumn}
-              aria-label="Select AC mode"
-            >
-              <option value="">Select Mode</option>
-              <option value="cool">Cool</option>
-              <option value="heat">Heat</option>
-              <option value="fan">Fan</option>
-              <option value="dry">Dry</option>
-              <option value="auto">Auto</option>
-            </select>
-          </div>
-
-          <div className={classes.formRow}>
-            <label htmlFor="acState" className={classes.labelColumn}>AC State:</label>
-            <select
-              id="acState"
-              name="acState"
-              value={acState}
-              onChange={(e) => setAcState(e.target.value)}
-              required
-              className={classes.inputColumn}
-              aria-label="Select AC state"
-            >
-              <option value="">Select AC State</option>
-              <option value="on">On</option>
-              <option value="off">Off</option>
-            </select>
-          </div>
-        </>
-      )}
-
-      {Object.keys(selectedDevices).filter(device => device !== 'AC').map((device, index) => (
-        <div key={index} className={classes.formRow}>
-          <label htmlFor={`deviceState_${device}`} className={classes.labelColumn}>{device} State:</label>
-          <select
-            id={`deviceState_${device}`}
-            name={`deviceState_${device}`}
-            value={selectedDevices[device] || ''}
-            onChange={(e) => handleDeviceStateChange(device, e.target.value)}
-            required
-            className={classes.inputColumn}
-            aria-label={`Select state for ${device}`}
-          >
-            <option value="">Select State</option>
-            <option value="on">On</option>
-            <option value="off">Off</option>
-          </select>
-        </div>
-      ))}
-
-      <div className={classes.formRow}>
-        <button type="submit" className={classes.RulesDashboardButton} disabled={isSubmitting}>
           {isSubmitting ? 'Adding...' : 'Add Rule'}
         </button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 };
 
 AddRuleComponent.defaultProps = {
-  spaceId: '', // Provide a default value for Space_ID if not provided
-  fullName: '', // Provide a default value for full name if not provided
+  spaceId: '',
+  fullName: '',
 };
 
 export default AddRuleComponent;
