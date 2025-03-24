@@ -11,7 +11,7 @@ import classes from "./RoomDevices.module.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
-import { toggleAcState } from "../../../services/ac.service";
+import { toggleAcState, executeAcCommand } from "../../../services/ac.service";
 import { Device } from "../../../components/Device/Device";
 import { SERVER_URL } from "../../../consts";
 import _ from "lodash";
@@ -164,15 +164,6 @@ const toggleHeater = async (value) => {
   }
 };
 
-const IDS_TOGGLES_MAP = {
-  [DEVICES_IDS_MAP.AC]: toggleAcState,
-  [DEVICES_IDS_MAP.LAUNDRY]: laundryToggle,
-  [DEVICES_IDS_MAP.HEATER]: toggleHeater,
-  [DEVICES_IDS_MAP.PUMP]: togglePump,
-};
-
-
-
 const RoomDevices = () => {
   const [devices, setDevices] = React.useState([]);
   const [laundryDetails, setLaundryDetails] = React.useState({});
@@ -188,7 +179,55 @@ const RoomDevices = () => {
   const [plotImage, setPlotImage] = useState('');
   const [collectivePlot, setCollectivePlot] = useState('');
   const [anomalyDetails, setAnomalyDetails] = useState([]);
+  
+  // Define IDS_TOGGLES_MAP inside the component to access the room state
+  const IDS_TOGGLES_MAP = {
+    [DEVICES_IDS_MAP.AC]: (props) => {
+      // Get room name safely, with fallback
+      const roomName = _.get(room, "name", "Unknown Room");
+      
+      // Log what we're passing to executeAcCommand
+      console.log("AC toggle request with props:", props);
+      console.log("Room name for action string:", roomName);
+      
+      if (!roomName || roomName === "Unknown Room") {
+        console.warn("Room name might be missing or invalid:", roomName);
+      }
+      
+      return executeAcCommand({ 
+        ...props, 
+        roomName 
+      });
+    },
+    [DEVICES_IDS_MAP.LAUNDRY]: laundryToggle,
+    [DEVICES_IDS_MAP.HEATER]: toggleHeater,
+    [DEVICES_IDS_MAP.PUMP]: togglePump,
+  };
+  
+  // Function to get the appropriate toggle function for a device
+  const getToggleFunctionForDevice = (device) => {
+    // Check if this is an AC device, regardless of ID
+    if (device.device_name.toLowerCase() === 'ac') {
+      // Return the AC toggle function
+      return (props) => {
+        const roomName = _.get(room, "name", "Unknown Room");
+        return executeAcCommand({
+          ...props,
+          roomName
+        });
+      };
+    }
     
+    // For other devices, check ID map
+    const toggleFunction = IDS_TOGGLES_MAP[device.device_id];
+    
+    if (toggleFunction) {
+      return toggleFunction;
+    }
+    
+    console.warn(`No toggle function found for device: ${device.device_name} (${device.device_id})`);
+    return undefined;
+  };
     
   const openHouseMap = () => {
       setModalIsOpen(true);
@@ -352,7 +391,7 @@ const RoomDevices = () => {
               )}
               <Device
                 device={device}
-                onToggleDeviceSwitch={IDS_TOGGLES_MAP[device.device_id]}
+                onToggleDeviceSwitch={getToggleFunctionForDevice(device)}
                 pumpDuration={pumpDuration}
                 setPumpDuration={setPumpDuration}
                 spaceId={spaceId}

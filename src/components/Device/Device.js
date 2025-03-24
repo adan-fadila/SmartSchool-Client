@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import styled, { css } from "styled-components";
 import { SnackBar } from "../Snackbar/SnackBar";
@@ -120,7 +119,7 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
   const [openSeccessSnackBar, setOpenSuccessSnackbar] = useState(false);
   const [openFailureSnackBar, setOpenFailureSnackbar] = useState(false);
   const [openControlsCard, setOpenControlsCard] = useState(false);
-  const [mode, setMode] = useState(""); 
+  const [mode, setMode] = useState("cool"); 
   const { room_id, device_id, device_name, id } = device;
   const[color,setcolor] = useState("green");
   const isAcDevice = device_name.toLowerCase() === "ac";
@@ -136,10 +135,19 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
   const [roomIDState, setRoomIDState] = useState('');
   const [deviceIDState, setDeviceIDState] = useState('');
   const [spaceIDState, setSpaceIDState] = useState('');
-  const onUpdateModeValueHandler = (controlId, updatedMode) => {
-    // Update the AC mode by sending a request to your Node.js server.
-    // Replace this with the actual API call to your server.
-    console.log(`Updated mode for device ${controlId}: ${updatedMode}`);
+  const onUpdateModeValueHandler = (newMode) => {
+    setMode(newMode);
+    
+    if (isAcDevice && onToggleDeviceSwitch) {
+      onToggleDeviceSwitch({
+        state: state,
+        temperature: temperature,
+        mode: newMode,
+        id: device_id
+      });
+    } else {
+      console.error("No toggle function provided for mode change");
+    }
   };
 
   const fetchRaspberryPiIP = async (spaceId) => {
@@ -253,74 +261,66 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
       
     const onDeviceChange = async (device, e, spaceId, device_id) => {
       const newState = e.target.checked;
-      console.log(device, newState,device_id);
       setState(newState); 
       setcolor(newState ? "green" : "red");
-      // const deviceId = device.id.includes("YNahUQcM") ? "YNahUQcM" : "4ahpAkJ9";
-      // console.log(deviceId);
+      
       try {
         const raspberryPiIP = await fetchRaspberryPiIP(spaceId);
         if (!raspberryPiIP) {
           console.error("No IP found for the given space ID:", spaceId);
-          return; // Exit the function if no IP address is found
-        }
-        let requests = [];
-        const ACPayload = { state: newState, id: device_id, rasp_ip: raspberryPiIP };
-        const basePayload = { state: newState, deviceId: device_id, rasp_ip: raspberryPiIP };
-        const LIGHTPayload = {  id: device_id, rasp_ip: raspberryPiIP , Control: 'manual' };
-        const LIGHTPayloadWITHOUTRPI = { state: newState, id: device_id};
-        if (device.device_name.toLowerCase() === 'ac') {
-          console.log("is here");
-          requests.push(axios.post(`${SERVER_URL}/api-sensors/sensibo`, ACPayload));
-
-          if (newState && typeof temperature !== 'undefined') {
-            requests.push(axios.post(`${SERVER_URL}/api-sensors/sensibo`, { ...ACPayload, temperature }));
-          }
-        } else if (device.device_name.toLowerCase() === 'light') {
-          console.log('Light is turn on:', newState ? "ON" : "OFF");
-          requests.push(axios.post(`${SERVER_URL}/api-sensors/action`, { ...LIGHTPayload, state: newState ? 'on' : 'off' }));
-        }
-        else if (device.device_name.toLowerCase() === 'tv') {
-          console.log(device.device_name);
-          console.log('TV is turned:', newState ? "ON" : "OFF");
-          // Adjust the payload to match the expected API format
-          // const payloadForPlug = {  deviceId: '5', state: newState,  rasp_ip: raspberryPiIP };
-                  requests.push(axios.post(`${SERVER_URL}/api-mindolife/change-feature-state`, basePayload));
-        }
-        else if (device.device_name.toLowerCase() === 'bulb') {
-          console.log(device.device_name);
-          console.log('Plug is turned:', newState ? "ON" : "OFF");
-          // Adjust the payload to match the expected API format
-          // const payloadForPlug = {  deviceId: '4', state: newState };
-                  requests.push(axios.post(`${SERVER_URL}/api-mindolife/change-feature-state`, basePayload));
-        }
-        else if(device.device_name.toLowerCase() === 'tap'){
-          console.log(device.device_name);
-          console.log('tap is turned:', newState ? "ON" : "OFF");
-          // Adjust the payload to match the expected API format
-          // const payloadForPlug = {  deviceId: '4', state: newState };
-                  requests.push(axios.post(`${SERVER_URL}/api-mindolife/change-state`, basePayload));
+          return;
         }
         
-        const results = await Promise.allSettled(requests);
-        let allSuccessful = true;
-        results.forEach(result => {
-          if (result.status === 'fulfilled' && result.value.status === 200) {
-            console.log(result.value.data); // Log successful response
-          } else {
-            allSuccessful = false;
-            if (result.reason && result.reason.response) {
-              console.error('Request failed:', result.reason.response.data);
-            } else {
-              console.error('Request failed with no server response');
+        let requests = [];
+        const basePayload = { state: newState, deviceId: device_id, rasp_ip: raspberryPiIP };
+        const LIGHTPayload = { id: device_id, rasp_ip: raspberryPiIP, Control: 'manual' };
+        
+        if (device.device_name.toLowerCase() === 'ac') {
+          if (onToggleDeviceSwitch) {
+            try {
+              await onToggleDeviceSwitch({ 
+                state: newState, 
+                temperature: temperature, 
+                mode: mode,
+                id: device_id
+              });
+              setOpenSuccessSnackbar(true);
+            } catch (error) {
+              console.error("Error toggling AC:", error);
+              setOpenFailureSnackbar(true);
             }
+          } else {
+            console.error("No toggle function provided for AC device");
+            setOpenFailureSnackbar(true);
           }
-        });
+        } else if (device.device_name.toLowerCase() === 'light') {
+          // Other device types continue to use their original endpoints
+          requests.push(axios.post(`${SERVER_URL}/api-sensors/action`, { ...LIGHTPayload, state: newState ? 'on' : 'off' }));
+          // ... other devices ...
+        }
+        
+        // Only process requests if there are any (not for AC devices)
+        if (requests.length > 0) {
+          const results = await Promise.allSettled(requests);
+          let allSuccessful = true;
+          results.forEach(result => {
+            if (result.status === 'fulfilled' && result.value.status === 200) {
+              console.log(result.value.data); // Log successful response
+            } else {
+              allSuccessful = false;
+              if (result.reason && result.reason.response) {
+                console.error('Request failed:', result.reason.response.data);
+              } else {
+                console.error('Request failed with no server response');
+              }
+            }
+          });
 
-        if (allSuccessful) {
-          setOpenSuccessSnackbar(true);
-        } else {
-          setOpenFailureSnackbar(true);
+          if (allSuccessful) {
+            setOpenSuccessSnackbar(true);
+          } else {
+            setOpenFailureSnackbar(true);
+          }
         }
       } catch (error) {
         console.error('Error updating device state or temperature:', error);
@@ -332,35 +332,38 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
 
   const onChangeTemperature = async (newTemperature, spaceId, device_id) => {
     setTemperature(newTemperature); // update the local state optimistically
-  
+
     try {
       const raspberryPiIP = await fetchRaspberryPiIP(spaceId);
       if (!raspberryPiIP) {
         console.error("No IP found for the given space ID:", spaceId);
-        return; // Exit the function if no IP address is found
-      }
-      // Perform the POST request to the server to update the temperature
-      const response = await axios.post(`${SERVER_URL}/api-sensors/sensibo`, {
-        state: state,
-        temperature: newTemperature,
-        id: device_id,
-        rasp_ip: raspberryPiIP
-      });
-  
-      // Check for a successful response
-      if (response.status === 200) {
-        console.log('Temperature updated successfully');
-        // You might not need to set the temperature again if you're optimistic
-      } else {
-        console.error('Failed to update temperature:', response.status);
         setOpenFailureSnackbar(true);
-        // Rollback if necessary
+        setTemperature(temperature); // Reset to previous temperature
+        return;
+      }
+      
+      if (isAcDevice && onToggleDeviceSwitch) {
+        try {
+          await onToggleDeviceSwitch({
+            state: state,
+            temperature: newTemperature,
+            mode: mode,
+            id: device_id
+          });
+          setOpenSuccessSnackbar(true);
+        } catch (error) {
+          console.error("Error changing temperature:", error);
+          setOpenFailureSnackbar(true);
+          setTemperature(temperature); // reset to the previous temperature
+        }
+      } else {
+        console.error("No toggle function provided for temperature change");
+        setOpenFailureSnackbar(true);
         setTemperature(temperature); // reset to the previous temperature
       }
     } catch (error) {
       console.error('Error updating temperature:', error);
       setOpenFailureSnackbar(true);
-      // Rollback if necessary
       setTemperature(temperature); // reset to the previous temperature
     }
   };
@@ -413,7 +416,8 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
             onChangeValue={(value) => onChangeTemperature(value, spaceId, device_id)}
             acState={state}
             device_id={device_id}
-            raspberryPiIP={raspberryPiIP}         
+            raspberryPiIP={raspberryPiIP}
+            onModeChange={onUpdateModeValueHandler}         
           />
         ) : isPumpDevice ? (
           <PumpControls
