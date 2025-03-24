@@ -1,417 +1,426 @@
 .formContainer {
-    display: flex;
-    flex-direction: column;
-    margin: 20px;
-    justify-content: center;
-    align-self: center;
-    max-width: 600px;
-    width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.sectionTitle {
+  text-align: left;
+  margin: 20px 0 20px;
+}
+
+.formRow {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  text-align: left;
+  margin-bottom: 10px;
+}
+
+.labelColumn {
+  flex: 1;
+}
+
+.inputColumn {
+  flex: 2;
+}
+
+.deviceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.deviceCheckbox {
+  flex: 1 1 auto;
+}
+
+.deviceLabel {
+  display: flex;
+  align-items: center;
+}
+
+.labelColumn {
+  width: 200px;
+  font-family: 'courier new', monospace;
+}
+
+.inputColumn {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  min-width: 120px;
+
+  &:focus {
+    outline: none;
+    border-color: #339af0;
+    box-shadow: 0 0 0 2px rgba(51, 154, 240, 0.1);
   }
-  .sectionTitle {
-    text-align: left;
-    margin: 20px 0 20px;
-  }
-  
-  .formRow {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    text-align: left;
-    margin-bottom: 10px;
-  }
-  // .formRow {
-  //   display: flex;
-  //   align-items: center;
-  //   margin-bottom: 10px;
-  // }
-  
-  .labelColumn {
-    flex: 1;
-  }
-  
-  .inputColumn {
-    flex: 2;
-  }
-  
-  .deviceRow {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  
-  .deviceCheckbox {
-    flex: 1 1 auto;
-  }
-  
-  .deviceLabel {
-    display: flex;
-    align-items: center;
-  }
-  
-  .labelColumn {
-    // flex: 1 1 100px;
-    width: 200px;
-    font-family: 'courier new', monospace;
-  }
-  .inputColumn {
-    // flex: 2 1 70px;
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    text-align: center;
-  }
-  
-  .RulesDashboardButton {
+}
+
+.RulesDashboardButton {
+  background-color: #00bcd4;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
     background-color: #00bcd4;
-    color: white;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-  
-    &:hover {
-      background-color: #00bcd4;
-    }
+  }
+}
+
+.ruleInputContainer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.ruleTextarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-family: 'Arial', sans-serif;
+  font-size: 16px;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.ruleExamples {
+  margin-bottom: 15px;
+  font-size: 14px;
+  color: #555;
+
+  ul {
+    margin-top: 8px;
+    padding-left: 20px;
   }
 
-  .ruleInputContainer {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    margin-bottom: 20px;
-  }
-
-  .ruleTextarea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-family: 'Arial', sans-serif;
-    font-size: 16px;
-    resize: vertical;
-    min-height: 120px;
-  }
-
-  .ruleExamples {
-    margin-bottom: 15px;
-    font-size: 14px;
-    color: #555;
-
-    ul {
-      margin-top: 8px;
-      padding-left: 20px;
-    }
-
-    li {
-      margin-bottom: 5px;
-      font-style: italic;
-    }
-  }
-
-  .availableOptionsContainer {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 20px;
-    margin-bottom: 20px;
-    padding: 15px;
-    background-color: #f5f5f5;
-    border-radius: 8px;
-  }
-
-  .availableOptions {
-    flex: 1;
-    min-width: 250px;
-    padding: 10px;
-    background-color: white;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-
-    h4 {
-      color: #00bcd4;
-      margin-top: 0;
-      margin-bottom: 10px;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 8px;
-    }
-
-    ul {
-      margin: 0;
-      padding-left: 20px;
-      list-style-type: circle;
-    }
-
-    li {
-      margin-bottom: 6px;
-      font-size: 14px;
-      color: #333;
-      cursor: pointer;
-      transition: color 0.2s ease;
-
-      &:hover {
-        color: #00bcd4;
-        text-decoration: underline;
-      }
-    }
-  }
-
-  .activeOptions {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
-    border: 1px solid #00bcd4;
-  }
-
-  .clickableOption {
-    padding: 5px;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
-
-    &:hover {
-      background-color: #f0f7f8;
-    }
-  }
-
-  .ruleBuilder {
-    margin-bottom: 20px;
-  }
-
-  .stepNavigation {
-    display: flex;
-    align-items: center;
-    margin-bottom: 20px;
-  }
-
-  .ruleSteps {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-    flex: 1;
-    justify-content: center;
-  }
-
-  .ruleStep {
-    padding: 8px 15px;
-    border-radius: 20px;
-    font-size: 14px;
-    font-weight: bold;
-  }
-
-  .activeStep {
-    background-color: #00bcd4;
-    color: white;
-  }
-
-  .inactiveStep {
-    background-color: #e0e0e0;
-    color: #757575;
-  }
-
-  .completedStep {
-    background-color: #4caf50;
-    color: white;
-  }
-
-  .helpText {
-    font-size: 14px;
-    color: #555;
-    margin-bottom: 20px;
+  li {
+    margin-bottom: 5px;
     font-style: italic;
-    text-align: center;
+  }
+}
+
+.availableOptionsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+}
+
+.availableOptions {
+  flex: 1;
+  min-width: 250px;
+  padding: 10px;
+  background-color: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+
+  h4 {
+    color: #00bcd4;
+    margin-top: 0;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
   }
 
-  .navButton {
-    padding: 8px 16px;
-    background-color: #f5f5f5;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-right: 20px;
-    cursor: pointer;
+  ul {
+    margin: 0;
+    padding-left: 20px;
+    list-style-type: circle;
+  }
+
+  li {
+    margin-bottom: 6px;
     font-size: 14px;
-    
+    color: #333;
+    cursor: pointer;
+    transition: color 0.2s ease;
+
     &:hover {
-      background-color: #e0e0e0;
-    }
-  }
-
-  .stepContainer {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-  }
-
-  .optionsList {
-    max-height: 300px;
-    overflow-y: auto;
-    padding-right: 5px;
-  }
-
-  .selectedOption {
-    background-color: #e1f5fe;
-    color: #00bcd4 !important;
-    font-weight: bold;
-    border-left: 3px solid #00bcd4;
-    padding-left: 8px !important;
-  }
-
-  .parametersContainer {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    background-color: #f5f5f5;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-  }
-
-  .parameterSection {
-    background-color: white;
-    padding: 15px;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-
-    h4 {
       color: #00bcd4;
-      margin-top: 0;
-      margin-bottom: 15px;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 8px;
+      text-decoration: underline;
     }
   }
+}
 
-  .parameterGroup {
+.activeOptions {
+  background-color: #e7f5ff;
+  border-color: #339af0;
+  color: #1971c2;
+}
+
+.clickableOption {
+  padding: 10px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: white;
+
+  &:hover {
+    background-color: #f8f9fa;
+    border-color: #adb5bd;
+  }
+}
+
+.ruleBuilder {
+  margin-bottom: 20px;
+}
+
+.stepNavigation {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.ruleSteps {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  flex: 1;
+  justify-content: center;
+}
+
+.ruleStep {
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.activeStep {
+  background-color: #00bcd4;
+  color: white;
+}
+
+.inactiveStep {
+  background-color: #e0e0e0;
+  color: #757575;
+}
+
+.completedStep {
+  background-color: #4caf50;
+  color: white;
+}
+
+.helpText {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 20px;
+  font-style: italic;
+  text-align: center;
+}
+
+.navButton {
+  padding: 8px 16px;
+  background-color: #f5f5f5;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-right: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  
+  &:hover {
+    background-color: #e0e0e0;
+  }
+}
+
+.stepContainer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.optionsList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.selectedOption {
+  background-color: #e1f5fe;
+  color: #00bcd4 !important;
+  font-weight: bold;
+  border-left: 3px solid #00bcd4;
+  padding-left: 8px !important;
+}
+
+.parametersContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background-color: #f5f5f5;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.parameterSection {
+  background-color: white;
+  padding: 15px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+  h4 {
+    color: #00bcd4;
+    margin-top: 0;
     margin-bottom: 15px;
-    display: flex;
-    align-items: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
   }
+}
 
-  .parameterLabel {
-    font-size: 14px;
-    font-weight: bold;
-    color: #333;
-    min-width: 100px;
-    margin-right: 10px;
+.parameterGroup {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.parameterLabel {
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  min-width: 100px;
+  margin-right: 10px;
+}
+
+.parameterInput {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100px;
+}
+
+.parameterSelect {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  min-width: 120px;
+}
+
+.inputGroup {
+  display: flex;
+  align-items: center;
+}
+
+.inputUnit {
+  margin-left: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.actionParameters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rulePreview {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  margin-bottom: 20px;
+
+  h4 {
+    margin: 0 0 10px 0;
+    color: #495057;
   }
+}
 
-  .parameterInput {
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 14px;
-    width: 100px;
+.previewText {
+  font-family: monospace;
+  font-size: 16px;
+  color: #212529;
+  padding: 10px;
+  background-color: white;
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+  min-height: 40px;
+}
+
+.section {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  margin-bottom: 20px;
+
+  h4 {
+    margin: 0 0 15px 0;
+    color: #495057;
+    font-size: 1.1em;
   }
+}
 
-  .parameterSelect {
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 14px;
-    min-width: 120px;
-  }
+.hint {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #fff3bf;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #694d00;
 
-  .inputGroup {
-    display: flex;
-    align-items: center;
-  }
-
-  .inputUnit {
-    margin-left: 8px;
-    font-size: 14px;
-    color: #666;
-  }
-
-  .actionParameters {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .rulePreview {
-    background-color: #f5f5f5;
-    border-left: 4px solid #00bcd4;
-    padding: 15px;
-    margin-top: 20px;
-    border-radius: 0 4px 4px 0;
-
-    h4 {
-      color: #00bcd4;
-      margin-top: 0;
-      margin-bottom: 10px;
-    }
-
-    .rulePreviewText {
-      font-family: 'courier new', monospace;
-      font-size: 16px;
-      color: #333;
-      font-weight: bold;
-    }
-  }
-
-  .textInputContainer {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    margin-bottom: 20px;
-  }
-
-  .ruleLabel {
-    font-size: 16px;
-    font-weight: bold;
-    margin-bottom: 10px;
-    color: #333;
-  }
-
-  .ruleTextArea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-family: 'Arial', sans-serif;
-    font-size: 16px;
-    resize: vertical;
-    min-height: 100px;
-    margin-bottom: 10px;
-  }
-
-  .hint {
-    background-color: #f5f5f5;
-    padding: 12px;
-    border-radius: 4px;
-    margin-top: 10px;
-    
-    p {
-      margin: 5px 0;
-      font-size: 14px;
-      color: #555;
-      
-      &:first-child {
-        font-weight: bold;
-      }
+  p {
+    margin: 5px 0;
+    &:first-child {
+      font-weight: 500;
+      margin-bottom: 8px;
     }
   }
+}
 
-  .submitButton {
-    background-color: #00bcd4;
-    color: white;
-    padding: 12px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    transition: background-color 0.3s ease;
-    margin-top: 10px;
-    width: 100%;
+.submitButton {
+  background-color: #339af0;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
 
-    &:hover {
-      background-color: #0097a7;
-    }
-
-    &:disabled {
-      background-color: #b0bec5;
-      cursor: not-allowed;
-    }
+  &:hover:not(:disabled) {
+    background-color: #1c7ed6;
   }
+
+  &:disabled {
+    background-color: #adb5bd;
+    cursor: not-allowed;
+  }
+}
+
+.conditionContainer {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.actionDetails {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 15px;
+}
