@@ -3,15 +3,23 @@ import styled, { css } from "styled-components";
 import { SnackBar } from "../Snackbar/SnackBar";
 import Switch from "../UI/Switch/Switch";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faLightbulb } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
 import { SERVER_URL } from "../../consts";
 import { AcControls } from "./Controls/CustomControls/AcControls";
 import { LaundryControls } from "./Controls/CustomControls/LaundryControls";
 import { PumpControls } from "./Controls/CustomControls/PumpControls";
 
+// Styled component for sensor value placeholder
+const SensorValuePlaceholder = styled.span`
+  font-size: 1.2rem; // Adjust size as needed
+  font-weight: bold;
+  color: #555; // Adjust color as needed
+  margin-right: 10px; // Align roughly where the switch was
+`;
 
 const DeviceCard = styled.div`
+  position: relative; /* Added for absolute positioning of the anomaly indicator */
   width: 18rem;
   min-width: 18rem;
   height: ${({ height }) => height};
@@ -113,9 +121,30 @@ const ShowControls = ({ setOpenControlsCard, openControlsCard }) => {
   );
 };
 
-export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDuration, spaceId }) => {
+// Add styled component for anomaly indicator
+const AnomalyIndicator = styled.div`
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  z-index: 1;
+  cursor: pointer;
+`;
+
+const FlickeringIcon = styled(FontAwesomeIcon)`
+  color: #ffd700;
+  font-size: 1.5rem;
+  animation: flicker 1s infinite;
+
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`;
+
+export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDuration, spaceId, isRpiSensor, hasAnomaly, onAnomalyClick }) => {
   const [state, setState] = useState(device.state === "on");
   const [temperature, setTemperature] = useState(24);
+  const [sensorValue, setSensorValue] = useState('--'); // State for fetched sensor value
   const [openSeccessSnackBar, setOpenSuccessSnackbar] = useState(false);
   const [openFailureSnackBar, setOpenFailureSnackbar] = useState(false);
   const [openControlsCard, setOpenControlsCard] = useState(false);
@@ -127,7 +156,6 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
   const isLaundryDevice = device_name.toLowerCase() === "laundry";
   const isPumpDevice = device_name.toLowerCase() === "pump";
   const isTapDevice = device_name.toLowerCase === "tap";
-// Assuming you're inside a React functional component
   const [temperatureUnit, setTemperatureUnit] = useState('C'); // Default to Celsius
   const [raspberryPiIP, setRaspberryPiIP] = useState('');
   const isWithControls = isAcDevice || isLaundryDevice || isPumpDevice;
@@ -256,6 +284,56 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
       }
     }, [motionDetected, device.device_name, device.device_id , deviceIDState]);
 
+// Effect to fetch sensor data for RPi sensors
+useEffect(() => {
+  let intervalId = null;
+
+  const fetchSensorData = async () => {
+    if (isRpiSensor && raspberryPiIP && device.device_type) {
+      console.log(`Fetching ${device.device_type} from ${raspberryPiIP}`);
+      try {
+        // Assuming this endpoint returns both temp & humidity
+        const response = await axios.get(`${SERVER_URL}/api-sensors/temperature?rasp_pi=${encodeURIComponent(raspberryPiIP)}`);
+        const data = response.data;
+
+        // Extract the relevant value based on the sensor type
+        let value = data[device.device_type];
+
+        if (value !== undefined) {
+          // Add units based on type
+          if (device.device_type === 'temperature') {
+            value = `${value.toFixed(1)} °C`; // Assuming Celsius
+          } else if (device.device_type === 'humidity') {
+            value = `${value.toFixed(1)} %`;
+          } else {
+            // Handle other potential sensor types if needed
+            value = value.toString();
+          }
+          setSensorValue(value);
+        } else {
+          console.warn(`Value for ${device.device_type} not found in response:`, data);
+          setSensorValue('N/A');
+        }
+      } catch (error) {
+        console.error(`Error fetching sensor data for ${device.device_type}:`, error);
+        setSensorValue('Error');
+      }
+    }
+  };
+
+  if (isRpiSensor && raspberryPiIP) {
+    fetchSensorData(); // Fetch immediately
+    // Set up polling every 10 seconds (adjust interval as needed)
+    intervalId = setInterval(fetchSensorData, 10000);
+  }
+
+  // Cleanup function to clear the interval when the component unmounts or dependencies change
+  return () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
+  };
+}, [isRpiSensor, raspberryPiIP, device.device_type]); // Re-run if these change
 
 // -------------------------------------DeviceChange---------------------------------------------
       
@@ -377,16 +455,31 @@ export const Device = ({ device, onToggleDeviceSwitch, pumpDuration, setPumpDura
   
   return (
     <DeviceCard
-      height={openControlsCard ? "auto" : "8rem"}
-      className={openControlsCard ? "expanded" : ""}
+      color={color}
+      height={isWithControls ? '8rem' : '7rem'}
+      className={openControlsCard ? 'expanded' : ''}
       isLaundryDevice={isLaundryDevice}
     >
+      {hasAnomaly && (
+        <AnomalyIndicator onClick={onAnomalyClick}>
+          <FlickeringIcon icon={faLightbulb} />
+        </AnomalyIndicator>
+      )}
+      
       <TopRow>
         <H2>{device_name}</H2>
-        <Switch
-          onChange={(e) => onDeviceChange(device, e, spaceId ,device_id)}
-          checked={state}
-        />
+        
+        {/* Only show switch for non-sensor devices that can be controlled */}
+        {!isRpiSensor ? (
+          <Switch
+            checked={state}
+            id={device_id}
+            onChange={() => onDeviceChange(device, { target: { checked: !state } }, spaceId, device_id)}
+            disabled={!onToggleDeviceSwitch} // Disable if no toggle function provided
+          />
+        ) : (
+          <SensorValuePlaceholder>{sensorValue}</SensorValuePlaceholder>
+        )}
       </TopRow>
       {openSeccessSnackBar && (
         <SnackBar

@@ -30,11 +30,26 @@ ws.addEventListener('message', (event) => {
 
         if (message.type === 'anomaly_update') {
             console.log("Processing anomaly update with data:", message.data);
+            console.log("Anomaly spaceId (raw):", message.data.spaceId);
+            
+            const spaceId = String(message.data.spaceId);
+            const roomId = String(message.data.roomId);
+            
+            console.log("Anomaly spaceId (string):", spaceId);
+            console.log("Anomaly roomId (string):", roomId);
+            
             eventEmitter.emit('anomalyUpdate', {
                 ...message.data,
                 plotImage: message.data.plot_image,
                 collectivePlot: message.data.collective_plot,
-                anomalies: message.data.anomalies
+                deviceType: message.data.sensorType,
+                roomId: roomId,
+                spaceId: spaceId,
+                timestamp: message.data.timestamp,
+                anomalies: message.data.anomalies,
+                rawEventName: message.data.rawEventName,
+                completeAnomalyName: message.data.completeAnomalyName,
+                anomalyType: message.data.anomalyType
             });
         } 
         else if (message.type === 'recommendation_update') {

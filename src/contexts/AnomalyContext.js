@@ -9,8 +9,11 @@ export const AnomalyProvider = ({ children }) => {
   });
 
   const setSpaceAnomaly = (spaceId, anomalyData) => {
+    console.log(`Setting anomaly for space with ID: ${spaceId}`, anomalyData);
+    
     if (!anomalyData) {
       // Remove the anomaly for this space
+      console.log(`Removing anomaly for space ${spaceId}`);
       setAnomalies(prev => ({
         ...prev,
         spaces: {
@@ -21,6 +24,7 @@ export const AnomalyProvider = ({ children }) => {
       return;
     }
 
+    console.log(`Adding anomaly for space ${spaceId}`, anomalyData);
     setAnomalies(prev => ({
       ...prev,
       spaces: {
@@ -35,29 +39,42 @@ export const AnomalyProvider = ({ children }) => {
   };
 
   const setRoomAnomaly = (roomId, anomalyData) => {
+    console.log(`Setting anomaly for room with ID: ${roomId}`, anomalyData);
+    
+    // Ensure roomId is a string
+    const roomIdStr = String(roomId);
+    
     if (!anomalyData) {
       // Remove the anomaly for this room
+      console.log(`Removing anomaly for room ${roomIdStr}`);
       setAnomalies(prev => ({
         ...prev,
         rooms: {
           ...prev.rooms,
-          [roomId]: undefined
+          [roomIdStr]: undefined
         }
       }));
       return;
     }
 
+    console.log(`Adding anomaly for room ${roomIdStr} with hasAnomaly=true`);
     setAnomalies(prev => ({
       ...prev,
       rooms: {
         ...prev.rooms,
-        [roomId]: {
+        [roomIdStr]: {
           deviceType: anomalyData.deviceType,
           hasAnomaly: true,
           timestamp: anomalyData.timestamp,
-          plotImage: anomalyData.plot_image,
-          collectivePlot: anomalyData.collective_plot,
-          anomalies: anomalyData.anomalies
+          plotImage: anomalyData.plotImage,
+          collectivePlot: anomalyData.collectivePlot,
+          anomalies: anomalyData.anomalies,
+          rawEventName: anomalyData.rawEventName,
+          completeAnomalyName: anomalyData.completeAnomalyName,
+          anomalyType: anomalyData.anomalyType,
+          // Store all other original data fields to be safe
+          location: anomalyData.location,
+          sensorType: anomalyData.sensorType
         }
       }
     }));

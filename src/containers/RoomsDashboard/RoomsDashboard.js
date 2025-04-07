@@ -110,27 +110,42 @@ const RoomsDashboard = ({ token }) => {
         const handleAnomalyUpdate = (anomalyData) => {
             console.log("Received anomaly update in RoomsDashboard:", {
                 roomId: anomalyData.roomId,
+                spaceId: anomalyData.spaceId,
+                currentSpaceId: spaceId,
                 hasPlotImage: !!anomalyData.plotImage,
                 plotImageLength: anomalyData.plotImage?.length,
                 hasCollectivePlot: !!anomalyData.collectivePlot,
-                collectivePlotLength: anomalyData.collectivePlot?.length
+                collectivePlotLength: anomalyData.collectivePlot?.length,
+                rawEventName: anomalyData.rawEventName,
+                completeAnomalyName: anomalyData.completeAnomalyName,
+                anomalyType: anomalyData.anomalyType
             });
             
-            if (anomalyData.roomId && anomalyData.spaceId === spaceId) {
-                setRoomAnomaly(anomalyData.roomId, {
+            // Convert to string for consistent comparison
+            const targetRoomId = String(anomalyData.roomId);
+            const currentSpaceId = String(spaceId);
+            
+            if (targetRoomId && anomalyData.spaceId === currentSpaceId) {
+                console.log(`Setting anomaly for room ${targetRoomId} in space ${currentSpaceId}`);
+                setRoomAnomaly(targetRoomId, {
                     deviceType: anomalyData.deviceType,
                     hasAnomaly: true,
                     timestamp: anomalyData.timestamp,
-                    plotImage: anomalyData.plot_image,
-                    collectivePlot: anomalyData.collective_plot,
-                    anomalies: anomalyData.anomalies  
+                    plotImage: anomalyData.plotImage || anomalyData.plot_image,
+                    collectivePlot: anomalyData.collectivePlot || anomalyData.collective_plot,
+                    anomalies: anomalyData.anomalies,
+                    rawEventName: anomalyData.rawEventName,
+                    completeAnomalyName: anomalyData.completeAnomalyName,
+                    anomalyType: anomalyData.anomalyType,
+                    location: anomalyData.location,
+                    sensorType: anomalyData.sensorType
                 });
             }
         };
 
         eventEmitter.on('anomalyUpdate', handleAnomalyUpdate);
         return () => eventEmitter.off('anomalyUpdate', handleAnomalyUpdate);
-    }, [spaceId]);
+    }, [spaceId, setRoomAnomaly]);
 
     const onClickRoomHandler = (roomId) => {
           // navigate(`/room/${roomId}`);
@@ -178,19 +193,20 @@ const RoomsDashboard = ({ token }) => {
             </Modal>
           <div className={roomsTest.length === 1 ? `${classes.RoomsContainer} ${classes.RoomsContainerStart}` : classes.RoomsContainer}>
               {roomsTest.map((roomData) => {
+                  const roomId = String(roomData.id); // Convert to string for consistent comparison
                   console.log("Rendering room:", {
-                      id: roomData.id,
-                      idType: typeof roomData.id,
-                      hasAnomaly: anomalies.rooms[roomData.id]?.hasAnomaly
+                      id: roomId,
+                      idType: typeof roomId, // Should be 'string'
+                      hasAnomaly: Boolean(anomalies.rooms[roomId]?.hasAnomaly)
                   });
                   return (
                       <div
-                          data-test={`room-card-${roomData.id}`}
-                          key={roomData.id}
+                          data-test={`room-card-${roomId}`}
+                          key={roomId}
                           className={roomsTest.length === 1 ? classes.ColumnSingle : classes.Column}
-                          onClick={() => onClickRoomHandler(roomData.id)}
+                          onClick={() => onClickRoomHandler(roomId)}
                       >
-                          {anomalies.rooms[roomData.id]?.hasAnomaly && (
+                          {anomalies.rooms[roomId]?.hasAnomaly && (
                               <div className={classes.anomalyIndicator}>
                                   <FontAwesomeIcon
                                       icon={faLightbulb}
@@ -199,7 +215,7 @@ const RoomsDashboard = ({ token }) => {
                               </div>
                           )}
                           <Room
-                              id={roomData.id}
+                              id={roomId}
                               name={roomData.name}
                               icon={iconMapping[roomData.icon]}
                               devicesCount={roomData.devices ? roomData.devices.length : 0}

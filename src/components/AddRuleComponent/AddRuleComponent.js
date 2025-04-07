@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import classes from './AddRuleComponent.module.scss';
 import { toast } from 'react-toastify';
+import axios from 'axios';
 import { SERVER_URL } from '../../consts';
+import { useSpace } from '../../contexts/SpaceContext';
 
 const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
   const [availableEvents, setAvailableEvents] = useState([]);
   const [availableActions, setAvailableActions] = useState([]);
+  const [availableAnomalies, setAvailableAnomalies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { spaceId: contextSpaceId } = useSpace();
+  const effectiveSpaceId = spaceId || contextSpaceId;
   
   // Rule state
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -20,10 +25,49 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
   // Preview text
   const [previewText, setPreviewText] = useState('');
 
-  // Fetch available events and actions
+  // Fetch available events, actions, and anomalies
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log(`Fetching anomaly descriptions for space ID: ${effectiveSpaceId}`);
+        
+        // Define the anomaly descriptions map
+        let anomalyDescriptions = {};
+        let rawAnomalyData = [];
+        
+        // First fetch anomaly descriptions using axios with the correct endpoint
+        try {
+          const anomalyResponse = await axios.get(`${SERVER_URL}/api/anomaly-descriptions/space/${effectiveSpaceId}`);
+          
+          console.log("Raw anomaly descriptions API response:", anomalyResponse.data);
+          
+          // Process the anomaly descriptions
+          if (anomalyResponse.data && anomalyResponse.data.success && Array.isArray(anomalyResponse.data.data)) {
+            // Extract the data array from the response
+            rawAnomalyData = anomalyResponse.data.data;
+            
+            // Create a map for looking up descriptions
+            rawAnomalyData.forEach(item => {
+              if (item && item.rawEventName) {
+                // Store the description keyed by rawEventName
+                anomalyDescriptions[item.rawEventName.toLowerCase()] = item.description || '';
+                
+                // Also store by location for simpler matching
+                if (item.location) {
+                  anomalyDescriptions[`${item.location.toLowerCase()} anomaly`] = item.description || '';
+                }
+              }
+            });
+            
+            console.log("Processed anomaly descriptions:", anomalyDescriptions);
+          } else if (anomalyResponse.data && !anomalyResponse.data.success) {
+            console.warn("API returned success: false", anomalyResponse.data);
+          }
+        } catch (anomalyError) {
+          console.error("Error fetching anomaly descriptions:", anomalyError);
+        }
+        
+        // Then fetch events and actions using the existing approach
         const [eventsResponse, actionsResponse] = await Promise.all([
           fetch(`${SERVER_URL}/api-events/available`),
           fetch(`${SERVER_URL}/api-actions/available`)
@@ -37,8 +81,42 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         const actionsData = await actionsResponse.json();
 
         if (eventsData.success && actionsData.success) {
-          setAvailableEvents(eventsData.events);
+          // Separate regular events and anomaly events
+          const regularEvents = eventsData.events.filter(event => !event.type?.includes('anomaly'));
+          const anomalyEvents = eventsData.events.filter(event => event.type?.includes('anomaly'));
+          
+          // Log the anomaly events for debugging
+          console.log("Anomaly events from API:", anomalyEvents);
+          
+          setAvailableEvents(regularEvents);
           setAvailableActions(actionsData.actions);
+          
+          // Use the raw anomaly data directly if possible, otherwise transform
+          let formattedAnomalies;
+          
+          if (rawAnomalyData.length > 0) {
+            // If we got anomaly descriptions from the API, use them directly
+            formattedAnomalies = rawAnomalyData.map(anomaly => {
+              return {
+                // Use only the description for display
+                name: anomaly.description,
+                // Keep original data for reference
+                originalName: anomaly.rawEventName,
+                location: anomaly.location,
+                type: 'anomaly',
+                subType: anomaly.anomalyType,
+                metricType: anomaly.metricType,
+                currentValue: { detected: anomaly.isActive || false },
+                room_id: anomaly.roomId
+              };
+            });
+            console.log("Using direct anomaly data from API:", formattedAnomalies);
+          } else {
+            // Do nothing - don't show any anomalies if we don't have descriptions
+            formattedAnomalies = [];
+          }
+          
+          setAvailableAnomalies(formattedAnomalies);
         } else {
           throw new Error('Invalid response format');
         }
@@ -51,12 +129,22 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
     };
 
     fetchData();
-  }, []);
+  }, [effectiveSpaceId]);
 
   // Update preview text whenever any value changes
   useEffect(() => {
     if (selectedEvent && selectedCondition) {
-      let preview = `if ${selectedEvent.location} ${selectedEvent.type} ${selectedCondition} ${conditionValue}`;
+      let preview = '';
+      
+      // For anomalies, use the description (name) directly
+      if (selectedEvent.type === 'anomaly') {
+        preview = `if ${selectedEvent.name} ${selectedCondition}`;
+      } else {
+        preview = `if ${selectedEvent.location} ${selectedEvent.type} ${selectedCondition}`;
+        if (conditionValue) {
+          preview += ` ${conditionValue}`;
+        }
+      }
       
       if (selectedAction) {
         let actionName = selectedAction.name;
@@ -94,6 +182,8 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         return ['>', '<', '=', '>=', '<='];
       case 'motion':
         return ['detected', 'not detected'];
+      case 'anomaly':
+        return ['detected', 'not detected'];
       default:
         return ['=', '!='];
     }
@@ -112,12 +202,40 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         if (actionMode) actionValue += ` ${actionMode}`;
       }
 
+      // For anomalies, we'll use the description (name) for display, but
+      // we need to ensure the backend gets the proper information
+      const eventString = selectedEvent.type === 'anomaly' 
+        ? `${selectedEvent.originalName || selectedEvent.name} ${selectedCondition}`
+        : `${selectedEvent.name} ${selectedCondition} ${conditionValue}`;
+
+      // Determine room_id for the rule
+      let ruleRoomId = selectedEvent.room_id;
+      
+      // If room_id is not available directly (especially for anomalies)
+      if (!ruleRoomId && selectedEvent.location) {
+        try {
+          const roomResponse = await fetch(`${SERVER_URL}/api-room/rooms/space/${effectiveSpaceId}`);
+          if (roomResponse.ok) {
+            const roomsData = await roomResponse.json();
+            const room = roomsData.find(r => 
+              r.name.toLowerCase() === selectedEvent.location.toLowerCase()
+            );
+            
+            if (room) {
+              ruleRoomId = room.id;
+            }
+          }
+        } catch (roomError) {
+          console.error('Error fetching room:', roomError);
+        }
+      }
+
       const ruleData = {
         description: previewText,
-        event: `${selectedEvent.name} ${selectedCondition} ${conditionValue}`,
+        event: eventString,
         action: `${selectedAction.name} ${actionValue}`,
-        room_id: selectedEvent.room_id,
-        space_id: spaceId,
+        room_id: ruleRoomId,
+        space_id: effectiveSpaceId,
         created_by: fullName || 'User'
       };
 
@@ -171,16 +289,40 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
     <div className={classes.formContainer}>
       <div className={classes.section}>
         <h4>1. Select Trigger Event</h4>
-        <div className={classes.optionsList}>
-          {availableEvents.map((event, index) => (
-            <div
-              key={index}
-              className={`${classes.clickableOption} ${selectedEvent?.name === event.name ? classes.activeOptions : ''}`}
-              onClick={() => setSelectedEvent(event)}
-            >
-              {event.location} - {event.type} (Current: {event.currentValue})
+        
+        <div className={classes.availableOptionsContainer}>
+          <div className={classes.availableOptions}>
+            <h4>Regular Events</h4>
+            <div className={classes.optionsList}>
+              {availableEvents.map((event, index) => (
+                <div
+                  key={`event-${index}`}
+                  className={`${classes.clickableOption} ${selectedEvent?.name === event.name ? classes.activeOptions : ''}`}
+                  onClick={() => setSelectedEvent(event)}
+                >
+                  {event.location} - {event.type} (Current: {String(event.currentValue)})
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          
+          <div className={classes.availableOptions}>
+            <h4>Anomaly Events</h4>
+            <div className={classes.optionsList}>
+              {availableAnomalies.map((anomaly, index) => (
+                <div
+                  key={`anomaly-${index}`}
+                  className={`${classes.clickableOption} ${selectedEvent?.name === anomaly.name ? classes.activeOptions : ''}`}
+                  onClick={() => setSelectedEvent(anomaly)}
+                >
+                  {anomaly.name}
+                </div>
+              ))}
+              {availableAnomalies.length === 0 && (
+                <div className={classes.noOptions}>No anomaly events available</div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -198,7 +340,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
                 <option key={condition} value={condition}>{condition}</option>
               ))}
             </select>
-            {selectedCondition && (
+            {selectedCondition && selectedEvent.type !== 'anomaly' && (
               <input
                 type={isNumericCondition(selectedEvent?.type) ? "number" : "text"}
                 value={conditionValue}
@@ -287,6 +429,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         <p>- if Living Room Temperature {'>'} 26 then Living Room AC on</p>
         <p>- if Living Room Temperature {'>'} 10 then Living Room AC on 20 heat</p>
         <p>- if Kitchen Motion detected then Kitchen Light on</p>
+        <p>- if living room temperature pointwise anomaly detected then Living Room Light on</p>
       </div>
     </div>
   );

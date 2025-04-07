@@ -32,6 +32,19 @@ export const Notification = () => {
     setNotification(message);
     const suggestionsPattern = /\b(Suggestion)\b/;
     const pumpPattern = /\b(PUMP)\b/;
+    const anomalyPattern = /\b(anomaly_update)\b/;
+
+    try {
+      // Try to parse as JSON first
+      const parsedMessage = JSON.parse(message);
+      if (parsedMessage.type === 'anomaly_update') {
+        // Show toast notification for anomalies
+        toast.warn(`Anomaly detected in ${parsedMessage.data.location || 'a room'} for ${parsedMessage.data.sensorType || 'a sensor'}`);
+        return;
+      }
+    } catch (e) {
+      // Not JSON, continue with text pattern matching
+    }
 
     if (suggestionsPattern.test(message))
       toast.info(event.data);

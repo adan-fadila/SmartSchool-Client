@@ -127,10 +127,11 @@ const SpacesDashboard = ({ spaceId }) => {
   useEffect(() => {
     const handleAnomalyUpdate = (anomalyData) => {
         console.log("SpacesDashboard received complete anomaly data:", anomalyData);
-        console.log("Image data present in SpacesDashboard:", !!anomalyData.image);
+        console.log("Anomaly spaceId:", anomalyData.spaceId);
         
         // Update space anomaly
         if (anomalyData.spaceId) {
+            console.log(`Setting anomaly for space ${anomalyData.spaceId}`);
             setSpaceAnomaly(anomalyData.spaceId, {
                 ...anomalyData,
                 hasAnomaly: true
@@ -139,6 +140,7 @@ const SpacesDashboard = ({ spaceId }) => {
         
         // Also update room anomaly
         if (anomalyData.roomId) {
+            console.log(`Setting anomaly for room ${anomalyData.roomId}`);
             setRoomAnomaly(anomalyData.roomId, {
                 ...anomalyData,
                 hasAnomaly: true
@@ -154,15 +156,19 @@ const SpacesDashboard = ({ spaceId }) => {
     <div className={classes.Row}>
       <SpacesSection>
           {spaces.map((space, index) => {
-            console.log("Space ID:", space.space_id, "Anomalies:", anomalies);
+            const spaceId = String(space.space_id); // Ensure we're comparing strings
+            console.log(`Rendering space: ${space.space_name} with ID ${spaceId}`);
+            console.log(`Has anomaly: ${Boolean(anomalies.spaces[spaceId]?.hasAnomaly)}`);
+            console.log(`Anomalies for this space:`, anomalies.spaces[spaceId]);
+            
             return (
               <div
-                data-test={`room-card-${space.space_id}`}
-                key={space.space_id || index}
+                data-test={`room-card-${spaceId}`}
+                key={spaceId || index}
                 className={classes.Column}
-                onClick={() => onClickRoomHandler(space.space_id)}
+                onClick={() => onClickRoomHandler(spaceId)}
               >
-                {anomalies.spaces[space.space_id]?.hasAnomaly && (
+                {anomalies.spaces[spaceId]?.hasAnomaly && (
                   <div className={classes.anomalyIndicator}>
                     <FontAwesomeIcon
                       icon={faLightbulb}
@@ -171,7 +177,7 @@ const SpacesDashboard = ({ spaceId }) => {
                   </div>
                 )}
                 <Space
-                  id={space.space_id}
+                  id={spaceId}
                   space_name={space.space_name}
                   type={space.type}
                   icon={iconMapping[space.icon]}

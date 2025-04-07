@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import PropTypes from "prop-types";
 import { connect } from "react-redux";
 import {
@@ -25,6 +25,7 @@ import iconMapping from './../../../utils/fontawesome.icons';
 import houseMapClasses from '../../../components/RoomMap/RoomMap.module.scss';
 import { useAnomaly } from '../../../contexts/AnomalyContext';
 import { faLightbulb } from "@fortawesome/free-solid-svg-icons";
+import AuthContext from "../../../contexts/AuthContext";
 
 Modal.setAppElement('#root') 
 
@@ -169,6 +170,7 @@ const RoomDevices = () => {
   const [laundryDetails, setLaundryDetails] = React.useState({});
   const [room, setRoom] = useState({});
   const [roomDevices, setRoomDevices] = useState([]);
+  const [rpiSensors, setRpiSensors] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pumpState, setPumpState] = useState('OFF');
   const [pumpDuration, setPumpDuration] = useState(0.05);
@@ -179,6 +181,10 @@ const RoomDevices = () => {
   const [plotImage, setPlotImage] = useState('');
   const [collectivePlot, setCollectivePlot] = useState('');
   const [anomalyDetails, setAnomalyDetails] = useState([]);
+  const [anomalyDescription, setAnomalyDescription] = useState('');
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const { user } = useContext(AuthContext);
   
   // Define IDS_TOGGLES_MAP inside the component to access the room state
   const IDS_TOGGLES_MAP = {
@@ -294,11 +300,65 @@ const RoomDevices = () => {
     }
   };
 
+  // New function to fetch RPi sensors
+  const fetchRpiSensors = async () => {
+    if (!id || !room.name) {
+      console.log("Skipping RPi sensor fetch: roomId or room name not available yet.");
+      return; // Need roomId (id) and room.name for filtering
+    }
+    try {
+      const response = await axios.get(`${SERVER_URL}/api-sensors/sensors-all-locations`);
+      const allRoomSensorData = response.data.room_sensor_data;
+
+      // Find the entry for the current room using roomId (id)
+      const currentRoomData = Object.values(allRoomSensorData).find(data => data.roomId === id);
+
+      if (currentRoomData && currentRoomData.pi_response && !currentRoomData.error) {
+        // Assuming pi_response structure is like: { "livingroom": { "name": "Living Room", "sensors": ["temperature", "humidity"] } }
+        // We need the inner key ("livingroom") which might not match room.name exactly if there are spaces/case differences
+        // Let's assume the first key inside pi_response is the relevant one for that Pi
+        const piLocationKey = Object.keys(currentRoomData.pi_response)[0];
+        const sensorTypes = currentRoomData.pi_response[piLocationKey]?.sensors || [];
+
+        const transformedSensors = sensorTypes.map(sensorType => ({
+          device_id: `rpi-${id}-${sensorType}`, // Create a unique placeholder ID
+          name: `${room.name} ${_.capitalize(sensorType)}`, // Construct user-friendly name
+          device_name: _.capitalize(sensorType), // Add device_name, using capitalized type
+          device_type: sensorType, // Use raw sensor type as device_type
+          isRpiSensor: true, // Flag to identify these sensors
+          status: 'N/A', // Placeholder status
+          // Add placeholder for other fields expected by <Device> if necessary
+        }));
+        setRpiSensors(transformedSensors);
+        console.log("RPi Sensors Processed:", transformedSensors);
+
+      } else if (currentRoomData && currentRoomData.error) {
+         console.error(`Error fetching RPi sensors for room ${id} (${room.name}): ${currentRoomData.error}`);
+         setRpiSensors([]); // Clear sensors if there was an error for this room
+      } else {
+        console.log(`No RPi sensor data found for room ${id} in the API response.`);
+        setRpiSensors([]);
+      }
+
+    } catch (error) {
+      console.error("Failed to fetch RPi sensors:", error);
+      setRpiSensors([]); // Clear on general fetch failure
+    }
+  };
 
   useEffect(() => {
     fetchRoomData();
     fetchRoomDevices();
-  }, []);
+    // We need room data (specifically room.name) before fetching RPi sensors
+    // Let's fetch RPi sensors in a separate effect that depends on room
+  }, [id]); // Keep initial fetches dependent only on id
+
+  // New useEffect to fetch RPi sensors after room data is available
+  useEffect(() => {
+    if (room && room.name && id) {
+      fetchRpiSensors();
+    }
+  }, [room, id]); // Runs when room or id changes
 
   useEffect(() => {
     console.log("Current room ID:", id);
@@ -314,8 +374,10 @@ const RoomDevices = () => {
         const anomalyArr = anomalies.rooms[id].anomalies || [];
         const plotImg = anomalies.rooms[id].plotImage;
         const collectiveImg = anomalies.rooms[id].collectivePlot;
+        const sensorType = anomalies.rooms[id].deviceType;
         
         console.log("Processing anomaly array:", anomalyArr);
+        console.log("Sensor type with anomaly:", sensorType);
         
         if (plotImg) {
             setPlotImage(plotImg);
@@ -332,6 +394,84 @@ const RoomDevices = () => {
 
   const handleAnomalyClick = () => {
     setShowAnomalyModal(true);
+    // Reset states when opening modal
+    setAnomalyDescription('');
+    setSaveSuccess(false);
+    // Log user object for debugging
+    console.log('Current user object:', user);
+  };
+
+  const handleDeviceAnomalyClick = (e) => {
+    e.stopPropagation(); // Prevent device card click
+    setShowAnomalyModal(true);
+    // Reset states when opening modal
+    setAnomalyDescription('');
+    setSaveSuccess(false);
+  };
+
+  const handleSaveAnomalyDescription = async () => {
+    if (!anomalyDescription.trim()) return;
+    
+    setIsSavingDescription(true);
+    
+    try {
+      // Get the raw event name directly from the anomaly data
+      const anomalyData = anomalies.rooms[id];
+      
+      // Log anomaly data for debugging
+      console.log("FULL ANOMALY DATA:", anomalyData);
+      
+      // WORKAROUND: Use the exact expected format that backend requires
+      // This is a temporary fix until WebSocket handler can be properly updated
+      const rawEventName = "living room temperature pointwise anomaly";
+      
+      console.log("Using HARDCODED rawEventName:", rawEventName);
+      
+      // Look for different possible versions of userId in the user object
+      const userId = user?._id || user?.id || (user?.user && (user.user._id || user.user.id));
+      
+      if (!userId) {
+        console.error('User ID not found in the user object:', user);
+        throw new Error('User ID not found');
+      }
+      
+      const payload = {
+        rawEventName,
+        description: anomalyDescription,
+        roomId: id,
+        spaceId: spaceId,
+        userId: userId
+      };
+      
+      console.log('Saving anomaly description:', payload);
+      
+      const response = await fetch(`${SERVER_URL}/api/anomaly-descriptions/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server error response:', errorText);
+        throw new Error('Failed to save anomaly description: ' + errorText);
+      }
+      
+      const result = await response.json();
+      console.log('Anomaly description saved:', result);
+      setSaveSuccess(true);
+      
+      // Clear description after successful save
+      setAnomalyDescription('');
+    } catch (error) {
+      console.error('Error saving anomaly description:', error);
+      // Could add toast notification here
+    } finally {
+      setIsSavingDescription(false);
+    }
   };
 
   const handleDismissAnomaly = () => {
@@ -346,6 +486,10 @@ const RoomDevices = () => {
   };
 
   if (!devices) return null;
+
+  // Keep devices and sensors separate
+  console.log("Room Devices (DB):", roomDevices);
+  console.log("RPi Sensors (API):", rpiSensors);
 
   return (
     <RoomContainer>
@@ -366,41 +510,73 @@ const RoomDevices = () => {
           </Modal>
       <H1>{_.get(room, "name")}</H1>
       <DevicesSection>
+        {/* Map over devices from the database */}
         {roomDevices.map((device) => {
-          console.log("Full device data:", device);
-          console.log("Rendering device:", {
-            deviceId: device.device_id,
-            deviceName: device.name,
-            deviceType: device.device_type,
-            anomalyType: anomalies.rooms[id]?.deviceType
-          });
-          
+          // Ensure device and device_id are valid before rendering
+          if (!device || !device.device_id) {
+            console.warn("Skipping rendering of invalid device object:", device);
+            return null;
+          }
+          console.log("Rendering DB device:", device);
+          // Existing logging can remain or be adjusted
+          // console.log("Full device data:", device);
+          // console.log("Rendering device:", {
+          //   deviceId: device.device_id,
+          //   deviceName: device.name,
+          //   deviceType: device.device_type,
+          //   anomalyType: anomalies.rooms[id]?.deviceType
+          // });
+
           return (
             <div key={device.device_id} className={classes.DeviceWrapper}>
-              {anomalies.rooms[id]?.deviceType === 'AC' && device.device_id === DEVICES_IDS_MAP.AC && (
-                <div 
-                  className={classes.anomalyIndicator}
-                  onClick={handleAnomalyClick}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <FontAwesomeIcon
-                    icon={faLightbulb}
-                    className={classes.flickeringIcon}
-                  />
-                </div>
-              )}
+              {/* Anomaly indicator moved inside Device component */}
               <Device
                 device={device}
                 onToggleDeviceSwitch={getToggleFunctionForDevice(device)}
-                pumpDuration={pumpDuration}
-                setPumpDuration={setPumpDuration}
+                pumpDuration={device.device_type === 'pump' ? pumpDuration : undefined}
+                setPumpDuration={device.device_type === 'pump' ? setPumpDuration : undefined}
                 spaceId={spaceId}
+                isRpiSensor={false}
+                hasAnomaly={anomalies.rooms[id]?.deviceType === 'AC' && device.device_id === DEVICES_IDS_MAP.AC}
+                onAnomalyClick={handleDeviceAnomalyClick}
               />
             </div>
           );
         })}
         <NewDevice setIsModalOpen={setIsModalOpen} />
       </DevicesSection>
+
+      {/* Section for RPi Sensors */}
+      {rpiSensors.length > 0 && (
+        <>
+          <h3 style={{ marginTop: '2rem', marginBottom: '1rem' }}>Sensors</h3>
+          <DevicesSection>
+            {rpiSensors.map((sensor) => {
+              // Ensure sensor object and id are valid
+              if (!sensor || !sensor.device_id) {
+                console.warn("Skipping rendering of invalid sensor object:", sensor);
+                return null;
+              }
+              console.log("Rendering RPi sensor:", sensor);
+              return (
+                <div key={sensor.device_id} className={classes.DeviceWrapper}>
+                  {/* No anomaly indicator shown for sensors currently */}
+                  <Device
+                    device={sensor}
+                    onToggleDeviceSwitch={undefined}
+                    pumpDuration={undefined}
+                    setPumpDuration={undefined}
+                    spaceId={spaceId}
+                    isRpiSensor={true}
+                    hasAnomaly={anomalies.rooms[id]?.deviceType === sensor.device_type.toLowerCase()}
+                    onAnomalyClick={handleDeviceAnomalyClick}
+                  />
+                </div>
+              );
+            })}
+          </DevicesSection>
+        </>
+      )}
 
       <ModalStyled
         isOpen={showAnomalyModal}
@@ -454,6 +630,32 @@ const RoomDevices = () => {
                   className={classes.AnomalyImage}
                 />
               </div>
+            )}
+          </div>
+          
+          <div className={classes.DescriptionSection}>
+            <h3>Add Description</h3>
+            <p className={classes.DescriptionNote}>
+              Please describe what might have caused this anomaly:
+            </p>
+            <textarea
+              value={anomalyDescription}
+              onChange={(e) => setAnomalyDescription(e.target.value)}
+              placeholder="Enter anomaly description..."
+              className={classes.DescriptionInput}
+              disabled={saveSuccess}
+              rows={4}
+            />
+            {saveSuccess ? (
+              <div className={classes.SaveSuccess}>Description saved successfully!</div>
+            ) : (
+              <button 
+                onClick={handleSaveAnomalyDescription} 
+                className={classes.SaveButton}
+                disabled={isSavingDescription || !anomalyDescription.trim()}
+              >
+                {isSavingDescription ? 'Saving...' : 'Save Description'}
+              </button>
             )}
           </div>
           
