@@ -65,6 +65,56 @@ const RulesTable = ({ rules, onRuleClick, selectedRule, fetchRules }) => {
       // Extract action
       const action = ruleParts[1].trim();
       
+      // Check if this is an SMS notification rule
+      const isSmsRule = action.includes('send sms to');
+      let notificationPhoneNumber = null;
+      let notificationMessage = null;
+      
+      if (isSmsRule) {
+        // Extract phone number from action
+        const phoneMatch = action.match(/send sms to\s+(\+?\d+)/i);
+        if (phoneMatch && phoneMatch[1]) {
+          notificationPhoneNumber = phoneMatch[1];
+          notificationMessage = event; // The event part becomes the notification message
+        } else {
+          toast.error('Invalid phone number format for SMS notification');
+          return;
+        }
+        
+        // For SMS rules, we don't need to extract room info
+        // Prepare the updated rule data specifically for SMS notification
+        const updatedRuleData = {
+          description: editValue,
+          event: event,
+          action: action,
+          isNotificationRule: true,
+          notificationPhoneNumber: notificationPhoneNumber,
+          notificationMessage: notificationMessage
+        };
+
+        const response = await axios.put(`${SERVER_URL}/api-rule/rules/${ruleId}`, updatedRuleData);
+        if (response.status === 200) {
+          toast.success("Rule updated successfully!");
+          const updatedRules = currentRules.map(rule => 
+            rule.id === ruleId ? { 
+              ...rule, 
+              description: editValue,
+              event: event,
+              action: action,
+              isNotificationRule: true,
+              notificationPhoneNumber: notificationPhoneNumber,
+              notificationMessage: notificationMessage
+            } : rule
+          );
+          setCurrentRules(updatedRules);
+          setEditRuleId(null);
+        } else {
+          toast.error("Failed to update rule.");
+        }
+        return;
+      }
+      
+      // If it's a regular rule (not SMS), continue with the existing logic
       // Extract room name from the event part (new format: "if [room name] [sensor]")
       let roomName = '';
       
@@ -120,7 +170,10 @@ const RulesTable = ({ rules, onRuleClick, selectedRule, fetchRules }) => {
         description: editValue,
         event: event,
         action: action,
-        room_id: roomId
+        room_id: roomId,
+        isNotificationRule: false,
+        notificationPhoneNumber: null,
+        notificationMessage: null
       };
 
       const response = await axios.put(`${SERVER_URL}/api-rule/rules/${ruleId}`, updatedRuleData);
@@ -132,7 +185,10 @@ const RulesTable = ({ rules, onRuleClick, selectedRule, fetchRules }) => {
             description: editValue,
             event: event,
             action: action,
-            room_id: roomId
+            room_id: roomId,
+            isNotificationRule: false,
+            notificationPhoneNumber: null,
+            notificationMessage: null
           } : rule
         );
         setCurrentRules(updatedRules);

@@ -21,6 +21,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
   const [actionState, setActionState] = useState(''); // on/off
   const [actionTemp, setActionTemp] = useState(''); // temperature for AC
   const [actionMode, setActionMode] = useState(''); // heat/cool for AC
+  const [phoneNumber, setPhoneNumber] = useState(''); // phone number for SMS notifications
 
   // Preview text
   const [previewText, setPreviewText] = useState('');
@@ -147,33 +148,45 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
       }
       
       if (selectedAction) {
-        let actionName = selectedAction.name;
-        if (actionName.startsWith(selectedAction.location)) {
-          actionName = actionName.substring(selectedAction.location.length).trim();
-        }
+        console.log("Selected action for preview:", selectedAction);
         
-        let actionText = `${selectedAction.location} ${actionName}`;
-        if (selectedAction.type === 'ac') {
-          if (actionState) {
-            actionText += ` ${actionState}`;
-            if (actionTemp) {
-              actionText += ` ${actionTemp}`;
-            }
-            if (actionMode) {
-              actionText += ` ${actionMode}`;
-            }
+        // Check if this is the SMS notification service by type
+        if (selectedAction.type === 'sms') {
+          console.log("SMS action detected for preview");
+          if (phoneNumber) {
+            preview += ` then send sms to ${phoneNumber}`;
+          } else {
+            preview += ` then send sms to [Enter phone number]`;
           }
         } else {
-          if (actionState) {
-            actionText += ` ${actionState}`;
+          let actionName = selectedAction.name;
+          if (actionName.startsWith(selectedAction.location)) {
+            actionName = actionName.substring(selectedAction.location.length).trim();
           }
+          
+          let actionText = `${selectedAction.location} ${actionName}`;
+          if (selectedAction.type === 'ac') {
+            if (actionState) {
+              actionText += ` ${actionState}`;
+              if (actionTemp) {
+                actionText += ` ${actionTemp}`;
+              }
+              if (actionMode) {
+                actionText += ` ${actionMode}`;
+              }
+            }
+          } else {
+            if (actionState) {
+              actionText += ` ${actionState}`;
+            }
+          }
+          preview += ` then ${actionText}`;
         }
-        preview += ` then ${actionText}`;
       }
       
       setPreviewText(preview);
     }
-  }, [selectedEvent, selectedCondition, conditionValue, selectedAction, actionState, actionTemp, actionMode]);
+  }, [selectedEvent, selectedCondition, conditionValue, selectedAction, actionState, actionTemp, actionMode, phoneNumber]);
 
   const getConditionOptions = (eventType) => {
     switch (eventType?.toLowerCase()) {
@@ -190,16 +203,53 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
   };
 
   const handleSubmit = async () => {
-    if (!selectedEvent || !selectedAction || !selectedCondition || !actionState) {
+    if (!selectedEvent || !selectedAction || !selectedCondition) {
       toast.error('Please complete all required fields');
+      return;
+    }
+
+    // Check if this is the SMS notification service by type
+    const isSmsNotification = selectedAction.type === 'sms';
+
+    // Additional validation for specific action types
+    if (!isSmsNotification && selectedAction.type === 'ac' && actionState === 'on' && (!actionTemp || !actionMode)) {
+      toast.error('Please complete AC settings');
+      return;
+    }
+
+    if (isSmsNotification && !phoneNumber) {
+      toast.error('Please enter a phone number for SMS notification');
       return;
     }
 
     try {
       let actionValue = actionState;
-      if (selectedAction.type === 'ac' && actionState === 'on') {
+      let isNotificationRule = false;
+      let notificationPhoneNumber = null;
+      let notificationMessage = null;
+      let actionString = '';
+
+      // Handle SMS notification action differently
+      if (isSmsNotification) {
+        console.log("Processing SMS notification rule");
+        isNotificationRule = true;
+        notificationPhoneNumber = phoneNumber;
+        
+        // For anomalies, use the full name as the message
+        if (selectedEvent.type === 'anomaly') {
+          notificationMessage = `${selectedEvent.name} ${selectedCondition}`;
+        } else {
+          // For regular events, format the message using event details
+          notificationMessage = `${selectedEvent.location} ${selectedEvent.type} ${selectedCondition} ${conditionValue}`.trim();
+        }
+        
+        actionString = `send sms to ${phoneNumber}`;
+      } else if (selectedAction.type === 'ac' && actionState === 'on') {
         if (actionTemp) actionValue += ` ${actionTemp}`;
         if (actionMode) actionValue += ` ${actionMode}`;
+        actionString = `${selectedAction.name} ${actionValue}`;
+      } else {
+        actionString = `${selectedAction.name} ${actionValue}`;
       }
 
       // For anomalies, we'll use the description (name) for display, but
@@ -230,13 +280,24 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         }
       }
 
+      // Generate the rule description based on the action type
+      let ruleDescription = '';
+      if (isNotificationRule) {
+        ruleDescription = `if ${notificationMessage} then send sms to ${notificationPhoneNumber}`;
+      } else {
+        ruleDescription = previewText;
+      }
+
       const ruleData = {
-        description: previewText,
+        description: ruleDescription,
         event: eventString,
-        action: `${selectedAction.name} ${actionValue}`,
+        action: actionString,
         room_id: ruleRoomId,
         space_id: effectiveSpaceId,
-        created_by: fullName || 'User'
+        created_by: fullName || 'User',
+        isNotificationRule: isNotificationRule,
+        notificationPhoneNumber: notificationPhoneNumber,
+        notificationMessage: notificationMessage
       };
 
       const response = await fetch(`${SERVER_URL}/api-rule/rules`, {
@@ -269,6 +330,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
     setActionState('');
     setActionTemp('');
     setActionMode('');
+    setPhoneNumber('');
   };
 
   if (loading) {
@@ -280,9 +342,18 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
   };
 
   const canSubmit = () => {
-    if (!selectedEvent || !selectedAction || !selectedCondition || !actionState) return false;
+    if (!selectedEvent || !selectedAction || !selectedCondition) return false;
+    
+    // Check if this is the SMS notification service by type
+    const isSmsNotification = selectedAction.type === 'sms';
+    
+    if (isSmsNotification) {
+      return phoneNumber.trim() !== '';
+    }
+    
     if (selectedAction.type === 'ac' && actionState === 'on' && (!actionTemp || !actionMode)) return false;
-    return true;
+    
+    return actionState !== '';
   };
 
   return (
@@ -361,10 +432,12 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
               key={index}
               className={`${classes.clickableOption} ${selectedAction?.name === action.name ? classes.activeOptions : ''}`}
               onClick={() => {
+                console.log("Selected action:", action);
                 setSelectedAction(action);
                 setActionState('');
                 setActionTemp('');
                 setActionMode('');
+                setPhoneNumber('');
               }}
             >
               {action.location} - {action.name} ({action.type})
@@ -374,37 +447,55 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
 
         {selectedAction && (
           <div className={classes.actionDetails}>
-            <select
-              value={actionState}
-              onChange={(e) => setActionState(e.target.value)}
-              className={classes.inputColumn}
-            >
-              <option value="">Select state</option>
-              <option value="on">On</option>
-              <option value="off">Off</option>
-            </select>
-
-            {selectedAction.type === 'ac' && actionState === 'on' && (
+            {/* Log the action name and check for SMS */}
+            {console.log("Rendering action details for:", selectedAction.name, "Type:", selectedAction.type, "Is SMS?", selectedAction.type === 'sms')}
+            
+            {selectedAction.type === 'sms' ? (
               <>
+                <label>Enter phone number for SMS notification:</label>
                 <input
-                  type="number"
-                  value={actionTemp}
-                  onChange={(e) => setActionTemp(e.target.value)}
-                  placeholder="Temperature"
+                  type="text"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="Enter phone number (e.g., +1234567890)"
                   className={classes.inputColumn}
                 />
+              </>
+            ) : (
+              <>
                 <select
-                  value={actionMode}
-                  onChange={(e) => setActionMode(e.target.value)}
+                  value={actionState}
+                  onChange={(e) => setActionState(e.target.value)}
                   className={classes.inputColumn}
                 >
-                  <option value="">Select mode</option>
-                  <option value="cool">Cool</option>
-                  <option value="heat">Heat</option>
-                  <option value="fan">Fan</option>
-                  <option value="dry">Dry</option>
-                  <option value="automatic">Automatic</option>
+                  <option value="">Select state</option>
+                  <option value="on">On</option>
+                  <option value="off">Off</option>
                 </select>
+
+                {selectedAction.type === 'ac' && actionState === 'on' && (
+                  <>
+                    <input
+                      type="number"
+                      value={actionTemp}
+                      onChange={(e) => setActionTemp(e.target.value)}
+                      placeholder="Temperature"
+                      className={classes.inputColumn}
+                    />
+                    <select
+                      value={actionMode}
+                      onChange={(e) => setActionMode(e.target.value)}
+                      className={classes.inputColumn}
+                    >
+                      <option value="">Select mode</option>
+                      <option value="cool">Cool</option>
+                      <option value="heat">Heat</option>
+                      <option value="fan">Fan</option>
+                      <option value="dry">Dry</option>
+                      <option value="automatic">Automatic</option>
+                    </select>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -430,6 +521,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         <p>- if Living Room Temperature {'>'} 10 then Living Room AC on 20 heat</p>
         <p>- if Kitchen Motion detected then Kitchen Light on</p>
         <p>- if living room temperature pointwise anomaly detected then Living Room Light on</p>
+        <p>- if Server Room Temperature {'>'} 28 then send sms to +1234567890</p>
       </div>
     </div>
   );
