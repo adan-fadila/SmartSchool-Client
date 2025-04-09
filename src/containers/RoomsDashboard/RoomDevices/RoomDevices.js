@@ -415,17 +415,18 @@ const RoomDevices = () => {
     setIsSavingDescription(true);
     
     try {
-      // Get the raw event name directly from the anomaly data
+      // Get the anomaly data from the WebSocket message
       const anomalyData = anomalies.rooms[id];
       
       // Log anomaly data for debugging
       console.log("FULL ANOMALY DATA:", anomalyData);
       
-      // WORKAROUND: Use the exact expected format that backend requires
-      // This is a temporary fix until WebSocket handler can be properly updated
-      const rawEventName = "living room temperature pointwise anomaly";
+      // Use the actual anomaly type from the WebSocket data
+      const anomalyType = anomalyData?.anomalyType || 'pointwise'; // Fallback to pointwise if not specified
+      const rawEventName = `${anomalyData?.location || 'living room'} ${anomalyData?.sensorType || 'temperature'} ${anomalyType} anomaly`;
       
-      console.log("Using HARDCODED rawEventName:", rawEventName);
+      console.log("Using anomaly type from WebSocket:", anomalyType);
+      console.log("Constructed rawEventName:", rawEventName);
       
       // Look for different possible versions of userId in the user object
       const userId = user?._id || user?.id || (user?.user && (user.user._id || user.user.id));
@@ -440,7 +441,10 @@ const RoomDevices = () => {
         description: anomalyDescription,
         roomId: id,
         spaceId: spaceId,
-        userId: userId
+        userId: userId,
+        metricType: anomalyData?.sensorType || 'temperature',
+        anomalyType: anomalyType,
+        location: anomalyData?.location || 'living room'
       };
       
       console.log('Saving anomaly description:', payload);
