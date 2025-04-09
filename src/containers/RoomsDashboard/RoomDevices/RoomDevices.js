@@ -418,14 +418,37 @@ const RoomDevices = () => {
       // Get the anomaly data from the WebSocket message
       const anomalyData = anomalies.rooms[id];
       
-      // Log anomaly data for debugging
+      // More detailed logging to diagnose the anomaly type
       console.log("FULL ANOMALY DATA:", anomalyData);
+      console.log("Anomaly type from data:", anomalyData?.anomalyType);
+      console.log("Raw event name from data:", anomalyData?.rawEventName);
+      console.log("Complete anomaly name from data:", anomalyData?.completeAnomalyName);
       
-      // Use the actual anomaly type from the WebSocket data
-      const anomalyType = anomalyData?.anomalyType || 'pointwise'; // Fallback to pointwise if not specified
-      const rawEventName = `${anomalyData?.location || 'living room'} ${anomalyData?.sensorType || 'temperature'} ${anomalyType} anomaly`;
+      // Determine the anomaly type with more robust fallback logic
+      let anomalyType = 'pointwise'; // Default fallback
       
-      console.log("Using anomaly type from WebSocket:", anomalyType);
+      // First try to get it directly from the anomalyType field
+      if (anomalyData?.anomalyType) {
+        anomalyType = anomalyData.anomalyType.toLowerCase();
+        console.log("Using anomalyType field:", anomalyType);
+      } 
+      // If not available, try to extract from rawEventName or completeAnomalyName
+      else if (anomalyData?.rawEventName || anomalyData?.completeAnomalyName) {
+        const eventName = (anomalyData?.rawEventName || anomalyData?.completeAnomalyName || '').toLowerCase();
+        if (eventName.includes('seasonal') || eventName.includes('seasonality')) {
+          anomalyType = 'seasonality';
+        } else if (eventName.includes('trend')) {
+          anomalyType = 'trend';
+        }
+        console.log("Extracted anomaly type from event name:", anomalyType);
+      }
+      
+      // Construct the raw event name using the determined anomaly type
+      const location = anomalyData?.location || 'living room';
+      const sensorType = anomalyData?.sensorType || 'temperature';
+      const rawEventName = `${location} ${sensorType} ${anomalyType} anomaly`;
+      
+      console.log("Final anomaly type being used:", anomalyType);
       console.log("Constructed rawEventName:", rawEventName);
       
       // Look for different possible versions of userId in the user object
@@ -442,9 +465,9 @@ const RoomDevices = () => {
         roomId: id,
         spaceId: spaceId,
         userId: userId,
-        metricType: anomalyData?.sensorType || 'temperature',
+        metricType: sensorType,
         anomalyType: anomalyType,
-        location: anomalyData?.location || 'living room'
+        location: location
       };
       
       console.log('Saving anomaly description:', payload);
