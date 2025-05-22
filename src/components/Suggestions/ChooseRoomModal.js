@@ -73,10 +73,23 @@ export default function ChooseRoomModal({ setIsModalOpen, selectedRule }) {
     const getRoomsThatContainsCurrentDevice = async () => {
       if (!selectedRule) return; // Adding a safety check
     
-      const action = selectedRule.split('TURN ')[1];
-      if (!action) return; // Additional safety check if 'TURN ' is not part of the string
-    
-      const device = action.split(" ")[0];
+      // Handle new format: "if Living Room motion true then Living Room LIGHT on"
+      const newFormatMatch = selectedRule.match(/then\s+([a-z\s]+)\s+([a-z]+)\s+(on|off)/i);
+      
+      let device;
+      if (newFormatMatch && newFormatMatch.length >= 3) {
+        // Extract device from new format rule
+        device = newFormatMatch[2].toUpperCase();
+      } else {
+        // Try old format: "Turn off during night"
+        const action = selectedRule.split('TURN ')[1];
+        if (!action) return; // Additional safety check if 'TURN ' is not part of the string
+        
+        device = action.split(" ")[0];
+      }
+      
+      console.log("Extracted device for room check:", device);
+      
       const response = await axios.get(`${SERVER_URL}/api-room/devices/rooms/${device}`);
       const connectedRooms = response.data;
       setRoomsWithCurrentDevice(connectedRooms.map((room) => room.room_id));

@@ -72,46 +72,75 @@ ws.addEventListener('message', (event) => {
         } 
         else if (message.type === 'recommendation_update') {
             console.log("Processing recommendation update with data:", message.data);
-            console.log("Recommendations structure:", message.data.recommendations);
             
-            if (!message.data.recommendations) {
-                console.error("No recommendations found in message data");
-                return;
-            }
-            
-            const transformedRecommendations = [];
-            
-            for (const [device, recommendations] of Object.entries(message.data.recommendations)) {
-                if (!Array.isArray(recommendations)) {
-                    console.error(`Recommendations for ${device} is not an array:`, recommendations);
-                    continue;
-                }
+            // Handle new format with recommended_rules array
+            if (message.data.recommended_rules && Array.isArray(message.data.recommended_rules)) {
+                console.log("Processing recommendations in new format:", message.data.recommended_rules);
                 
-                console.log(`Processing device: ${device}`, recommendations);
-                recommendations.forEach(rec => {
-                    if (!rec.recommendation || !rec.recommended_time) {
-                        console.error(`Invalid recommendation format for ${device}:`, rec);
-                        return;
+                const transformedRecommendations = message.data.recommended_rules.map((rule, index) => {
+                    // Extract device info from the rule
+                    const ruleLower = rule.toLowerCase();
+                    let device = 'Unknown Device';
+                    
+                    // Try to extract device from rule text
+                    const deviceMatch = ruleLower.match(/then\s+([a-z\s]+)\s+([a-z]+)\s+(on|off)/i);
+                    if (deviceMatch && deviceMatch.length >= 3) {
+                        device = `${deviceMatch[1]} ${deviceMatch[2]}`.trim();
                     }
                     
-                    const transformed = {
-                        id: `${device}_${rec.recommendation}_${rec.recommended_time}`.replace(/\s+/g, '_'),
-                        device: device.replace(/_/g, ' '),
-                        normalized_rule: `Turn ${rec.recommendation} during ${rec.recommended_time}`,
+                    return {
+                        id: `rule_${index}_${Date.now()}`,
+                        device: device,
+                        normalized_rule: rule,
                         is_new: true
                     };
-                    console.log("Transformed recommendation:", transformed);
-                    transformedRecommendations.push(transformed);
                 });
-            }
-            
-            if (transformedRecommendations.length === 0) {
-                console.warn("No recommendations were transformed");
+                
+                console.log("Final transformed recommendations:", transformedRecommendations);
+                eventEmitter.emit('recommendationUpdate', transformedRecommendations);
                 return;
             }
             
-            console.log("Final transformed recommendations:", transformedRecommendations);
-            eventEmitter.emit('recommendationUpdate', transformedRecommendations);
+            // Handle old format (keeping for backward compatibility)
+            if (message.data.recommendations) {
+                console.log("Recommendations structure:", message.data.recommendations);
+                
+                const transformedRecommendations = [];
+                
+                for (const [device, recommendations] of Object.entries(message.data.recommendations)) {
+                    if (!Array.isArray(recommendations)) {
+                        console.error(`Recommendations for ${device} is not an array:`, recommendations);
+                        continue;
+                    }
+                    
+                    console.log(`Processing device: ${device}`, recommendations);
+                    recommendations.forEach(rec => {
+                        if (!rec.recommendation || !rec.recommended_time) {
+                            console.error(`Invalid recommendation format for ${device}:`, rec);
+                            return;
+                        }
+                        
+                        const transformed = {
+                            id: `${device}_${rec.recommendation}_${rec.recommended_time}`.replace(/\s+/g, '_'),
+                            device: device.replace(/_/g, ' '),
+                            normalized_rule: `Turn ${rec.recommendation} during ${rec.recommended_time}`,
+                            is_new: true
+                        };
+                        console.log("Transformed recommendation:", transformed);
+                        transformedRecommendations.push(transformed);
+                    });
+                }
+                
+                if (transformedRecommendations.length === 0) {
+                    console.warn("No recommendations were transformed");
+                    return;
+                }
+                
+                console.log("Final transformed recommendations:", transformedRecommendations);
+                eventEmitter.emit('recommendationUpdate', transformedRecommendations);
+            } else {
+                console.error("No recommendations found in message data");
+            }
         }
     } catch (error) {
         console.error('Error processing WebSocket message:', error);

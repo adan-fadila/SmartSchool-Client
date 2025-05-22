@@ -90,6 +90,22 @@ export const getSuggestions = async () => {
 
 
   export const addRoomToRule =  async(rule, room) => {
+    // Check if the rule already contains a room reference
+    if (rule.includes(` in ${room}`)) {
+      // Rule already has this room, just add it as is
+      await axios.post(`${SERVER_URL}/api-rule/rules`, {rule: rule});
+      return;
+    }
+
+    // Handle new format rules (if ... then ... format)
+    if (rule.toLowerCase().startsWith('if ') && rule.includes(' then ')) {
+      // For rules in the format "if Living Room motion true then Living Room LIGHT on"
+      // We don't need to add the room since it's already specified in the rule
+      await axios.post(`${SERVER_URL}/api-rule/rules`, {rule: rule});
+      return;
+    }
+
+    // Handle old format rules (Turn X during Y)
     const ruleWithRoom = rule + ` in ${room}`;
-    await axios.post(`${SERVER_URL}/api-rule/rules`, {rule: ruleWithRoom });
+    await axios.post(`${SERVER_URL}/api-rule/rules`, {rule: ruleWithRoom});
   }
