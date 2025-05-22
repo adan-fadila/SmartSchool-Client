@@ -118,7 +118,9 @@ const RoomsDashboard = ({ token }) => {
                 collectivePlotLength: anomalyData.collectivePlot?.length,
                 rawEventName: anomalyData.rawEventName,
                 completeAnomalyName: anomalyData.completeAnomalyName,
-                anomalyType: anomalyData.anomalyType
+                anomalyType: anomalyData.anomalyType,
+                name: anomalyData.name,
+                anomaliesType: typeof anomalyData.anomalies
             });
             
             // Convert to string for consistent comparison
@@ -135,10 +137,11 @@ const RoomsDashboard = ({ token }) => {
                     collectivePlot: anomalyData.collectivePlot || anomalyData.collective_plot,
                     anomalies: anomalyData.anomalies,
                     rawEventName: anomalyData.rawEventName,
-                    completeAnomalyName: anomalyData.completeAnomalyName,
+                    completeAnomalyName: anomalyData.completeAnomalyName || anomalyData.name,
                     anomalyType: anomalyData.anomalyType,
                     location: anomalyData.location,
-                    sensorType: anomalyData.sensorType
+                    sensorType: anomalyData.sensorType,
+                    name: anomalyData.name
                 });
             }
         };

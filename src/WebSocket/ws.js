@@ -38,6 +38,23 @@ ws.addEventListener('message', (event) => {
             console.log("Anomaly spaceId (string):", spaceId);
             console.log("Anomaly roomId (string):", roomId);
             
+            // Determine if this is a range anomaly or point anomaly
+            const anomalies = message.data.anomalies;
+            const isRangeAnomaly = anomalies && typeof anomalies === 'object' && !Array.isArray(anomalies) && 
+                                  'start' in anomalies && 'end' in anomalies;
+            const isPointAnomaly = Array.isArray(anomalies);
+            
+            console.log("Anomaly type determination:", {
+                isRangeAnomaly,
+                isPointAnomaly,
+                anomalyStructure: typeof anomalies
+            });
+            
+            // Set anomaly type based on structure
+            const anomalyType = isRangeAnomaly ? 'collective' : 
+                               isPointAnomaly ? 'pointwise' : 
+                               message.data.anomalyType || 'unknown';
+            
             eventEmitter.emit('anomalyUpdate', {
                 ...message.data,
                 plotImage: message.data.plot_image,
@@ -49,7 +66,8 @@ ws.addEventListener('message', (event) => {
                 anomalies: message.data.anomalies,
                 rawEventName: message.data.rawEventName,
                 completeAnomalyName: message.data.completeAnomalyName,
-                anomalyType: message.data.anomalyType
+                anomalyType: anomalyType, // Use the determined type
+                name: message.data.name
             });
         } 
         else if (message.type === 'recommendation_update') {

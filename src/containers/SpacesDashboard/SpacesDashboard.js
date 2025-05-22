@@ -143,7 +143,8 @@ const SpacesDashboard = ({ spaceId }) => {
             console.log(`Setting anomaly for room ${anomalyData.roomId}`);
             setRoomAnomaly(anomalyData.roomId, {
                 ...anomalyData,
-                hasAnomaly: true
+                hasAnomaly: true,
+                completeAnomalyName: anomalyData.completeAnomalyName || anomalyData.name
             });
         }
     };

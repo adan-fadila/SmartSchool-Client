@@ -371,12 +371,12 @@ const RoomDevices = () => {
         console.log("Full anomaly data:", anomalies.rooms[id]);
         
         // Extract the anomalies array from the WebSocket message
-        const anomalyArr = anomalies.rooms[id].anomalies || [];
+        const anomalyData = anomalies.rooms[id].anomalies || [];
         const plotImg = anomalies.rooms[id].plotImage;
         const collectiveImg = anomalies.rooms[id].collectivePlot;
         const sensorType = anomalies.rooms[id].deviceType;
         
-        console.log("Processing anomaly array:", anomalyArr);
+        console.log("Processing anomaly data:", anomalyData);
         console.log("Sensor type with anomaly:", sensorType);
         
         if (plotImg) {
@@ -385,9 +385,15 @@ const RoomDevices = () => {
         if (collectiveImg) {
             setCollectivePlot(collectiveImg);
         }
-        if (Array.isArray(anomalyArr)) {
-            setAnomalyDetails(anomalyArr);
-            console.log("Set anomaly details:", anomalyArr);
+        
+        // Check if anomalyData is an array (point anomalies) or an object with start/end (range anomalies)
+        if (Array.isArray(anomalyData)) {
+            setAnomalyDetails(anomalyData);
+            console.log("Set point anomaly details:", anomalyData);
+        } else if (anomalyData && typeof anomalyData === 'object' && 'start' in anomalyData && 'end' in anomalyData) {
+            // Handle range-based anomalies
+            setAnomalyDetails([anomalyData]);
+            console.log("Set range anomaly details:", anomalyData);
         }
     }
   }, [anomalies, id]);
@@ -624,9 +630,26 @@ const RoomDevices = () => {
                       <li key={index}>
                         <div className={classes.AnomalyItem}>
                           <span className={classes.DetectionNumber}>Detection #{index + 1}</span>
-                          <span className={classes.AnomalyValue}>Value: {detail.anomaly_val.toFixed(2)}</span>
+                          {/* Display range values if they exist, otherwise show single anomaly value */}
+                          {detail.start !== undefined && detail.end !== undefined ? (
+                            <span className={classes.AnomalyValue}>
+                              Range: {detail.start} - {detail.end}
+                            </span>
+                          ) : (
+                            <span className={classes.AnomalyValue}>
+                              {detail.timestamp ? `Time: ${detail.timestamp}` : ''} 
+                              {detail.anomaly_val !== undefined ? 
+                                ` Value: ${typeof detail.anomaly_val === 'boolean' ? 
+                                  (detail.anomaly_val ? 'True' : 'False') : 
+                                  detail.anomaly_val.toFixed(2)}` : 
+                                ''}
+                              {detail.anomaly_score !== undefined ? ` Score: ${detail.anomaly_score}` : ''}
+                            </span>
+                          )}
                           <span className={classes.Algorithms}>
-                            Detected by: {detail.voting_algorithms.split(',').map(algo => algo.replace('Algorithm', '')).join(' & ')}
+                            Detected by: {Array.isArray(detail.voting_algorithms) 
+                              ? detail.voting_algorithms.map(algo => algo.replace('Algorithm', '')).join(' & ')
+                              : (detail.voting_algorithms || '').split(',').map(algo => algo.replace('Algorithm', '')).join(' & ')}
                           </span>
                         </div>
                       </li>
