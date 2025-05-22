@@ -142,7 +142,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         preview = `if ${selectedEvent.name} ${selectedCondition}`;
       } else {
         preview = `if ${selectedEvent.location} ${selectedEvent.type} ${selectedCondition}`;
-        if (conditionValue) {
+        if (conditionValue && selectedEvent.type.toLowerCase() !== 'motion') {
           preview += ` ${conditionValue}`;
         }
       }
@@ -194,7 +194,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
       case 'humidity':
         return ['>', '<', '=', '>=', '<='];
       case 'motion':
-        return ['detected', 'not detected'];
+        return ['true', 'false'];
       case 'anomaly':
         return ['detected', 'not detected'];
       default:
@@ -238,8 +238,11 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         // For anomalies, use the full name as the message
         if (selectedEvent.type === 'anomaly') {
           notificationMessage = `${selectedEvent.name} ${selectedCondition}`;
+        } else if (selectedEvent.type.toLowerCase() === 'motion') {
+          // For motion, don't include conditionValue
+          notificationMessage = `${selectedEvent.location} ${selectedEvent.type} ${selectedCondition}`.trim();
         } else {
-          // For regular events, format the message using event details
+          // For other regular events, format the message using event details with conditionValue
           notificationMessage = `${selectedEvent.location} ${selectedEvent.type} ${selectedCondition} ${conditionValue}`.trim();
         }
         
@@ -254,9 +257,15 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
 
       // For anomalies, we'll use the description (name) for display, but
       // we need to ensure the backend gets the proper information
-      const eventString = selectedEvent.type === 'anomaly' 
-        ? `${selectedEvent.originalName || selectedEvent.name} ${selectedCondition}`
-        : `${selectedEvent.name} ${selectedCondition} ${conditionValue}`;
+      let eventString;
+      if (selectedEvent.type === 'anomaly') {
+        eventString = `${selectedEvent.originalName || selectedEvent.name} ${selectedCondition}`;
+      } else if (selectedEvent.type.toLowerCase() === 'motion') {
+        // For motion, use the true/false value directly without additional conditionValue
+        eventString = `${selectedEvent.name} ${selectedCondition}`;
+      } else {
+        eventString = `${selectedEvent.name} ${selectedCondition} ${conditionValue}`;
+      }
 
       // Determine room_id for the rule
       let ruleRoomId = selectedEvent.room_id;
