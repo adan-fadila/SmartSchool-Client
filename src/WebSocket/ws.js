@@ -73,9 +73,9 @@ ws.addEventListener('message', (event) => {
         else if (message.type === 'recommendation_update') {
             console.log("Processing recommendation update with data:", message.data);
             
-            // Handle new format with recommended_rules array
+            // Handle new format with recommended_rules array directly in data
             if (message.data.recommended_rules && Array.isArray(message.data.recommended_rules)) {
-                console.log("Processing recommendations in new format:", message.data.recommended_rules);
+                console.log("Processing recommendations in new format (direct):", message.data.recommended_rules);
                 
                 const transformedRecommendations = message.data.recommended_rules.map((rule, index) => {
                     // Extract device info from the rule
@@ -101,9 +101,42 @@ ws.addEventListener('message', (event) => {
                 return;
             }
             
+            // Handle new format with recommended_rules nested inside recommendations object
+            if (message.data.recommendations && message.data.recommendations.recommended_rules && 
+                Array.isArray(message.data.recommendations.recommended_rules)) {
+                
+                console.log("Processing recommendations in new nested format:", message.data.recommendations.recommended_rules);
+                
+                const transformedRecommendations = message.data.recommendations.recommended_rules.map((rule, index) => {
+                    // Extract device info from the rule
+                    const ruleLower = rule.toLowerCase();
+                    let device = 'Unknown Device';
+                    
+                    // Try to extract device from rule text
+                    const deviceMatch = ruleLower.match(/then\s+([a-z\s]+)\s+([a-z]+)\s+(on|off)/i);
+                    if (deviceMatch && deviceMatch.length >= 3) {
+                        device = `${deviceMatch[1]} ${deviceMatch[2]}`.trim();
+                    }
+                    
+                    return {
+                        id: `rule_${index}_${Date.now()}`,
+                        device: device,
+                        normalized_rule: rule,
+                        is_new: true
+                    };
+                });
+                
+                console.log("Final transformed recommendations:", transformedRecommendations);
+                eventEmitter.emit('recommendationUpdate', transformedRecommendations);
+                return;
+            }
+            
             // Handle old format (keeping for backward compatibility)
-            if (message.data.recommendations) {
-                console.log("Recommendations structure:", message.data.recommendations);
+            if (message.data.recommendations && typeof message.data.recommendations === 'object' && 
+                !Array.isArray(message.data.recommendations) && 
+                !message.data.recommendations.recommended_rules) {
+                
+                console.log("Processing recommendations in old format:", message.data.recommendations);
                 
                 const transformedRecommendations = [];
                 
@@ -139,7 +172,7 @@ ws.addEventListener('message', (event) => {
                 console.log("Final transformed recommendations:", transformedRecommendations);
                 eventEmitter.emit('recommendationUpdate', transformedRecommendations);
             } else {
-                console.error("No recommendations found in message data");
+                console.error("No valid recommendations format found in message data");
             }
         }
     } catch (error) {
