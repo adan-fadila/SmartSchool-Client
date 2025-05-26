@@ -441,10 +441,14 @@ const RoomDevices = () => {
       // If not available, try to extract from rawEventName or completeAnomalyName
       else if (anomalyData?.rawEventName || anomalyData?.completeAnomalyName) {
         const eventName = (anomalyData?.rawEventName || anomalyData?.completeAnomalyName || '').toLowerCase();
-        if (eventName.includes('seasonal') || eventName.includes('seasonality')) {
-          anomalyType = 'seasonality';
-        } else if (eventName.includes('trend')) {
-          anomalyType = 'trend';
+        if (eventName.includes('collective') || eventName.includes('collective')) {
+          console.log("==========================================================================");
+          console.log(eventName);
+          console.log("==========================================================================");
+
+          anomalyType = 'collective';
+        } else if (eventName.includes('pointwise')) {
+          anomalyType = 'pointwise';
         }
         console.log("Extracted anomaly type from event name:", anomalyType);
       }
