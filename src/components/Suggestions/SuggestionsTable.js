@@ -3,11 +3,12 @@ import Modal from "react-modal";
 import Pagination from "@mui/material/Pagination";
 import React from "react";
 import { useState, useEffect, useMemo } from "react";
+import { toast } from "react-toastify";
 import {
   addSuggestedRule,
-  getSuggestions,
   onDeleteSuggestion,
-  updateSuggestions
+  updateSuggestions,
+  createRuleFromSuggestion
 } from "./suggestions.service";
 import styled from "styled-components";
 import { RuleCell } from "./RuleCell";
@@ -27,16 +28,15 @@ import {
   ThStyled,
   TitleStyled2,
   ModalStyled,
-  ChooseRoomModalStyled,
   RuleModalStyled
 } from "./suggestions.styles";
 import { RuleModal } from "./RuleModal";
 import { SERVER_URL, TABLET_HEIGHT, TABLET_WIDTH } from "../../consts";
-import ChooseRoomModal from "./ChooseRoomModal";
 import axios from "axios";
 import { eventEmitter } from "../../WebSocket/ws";
 import ICE from '../../assets/IEC2.png'; 
 import { useSuggestions } from '../../contexts/SuggestionsContext';
+import { useSpace } from '../../contexts/SpaceContext';
 
 const itemsPerPage = 7; // Define how many items you want per page
 export const SuggestionsTable = () => {
@@ -45,14 +45,17 @@ export const SuggestionsTable = () => {
     setSuggestions, 
     newSuggestionsCount, 
     setNewSuggestionsCount,
-    removeSuggestion 
+    removeSuggestion,
+    markSuggestionsAsRead
   } = useSuggestions();
+  
+  const { spaceId } = useSpace();
   
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRule, setSelectedRule] = useState(null);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
   const [isClickable, setIsClickable] = useState(true);
-  const [isChooseRoomModalOpen, setIsChooseRoomModalOpen] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(new Set());
 
   // for making rules clickable only on tablet
   useEffect(() => {
@@ -78,10 +81,6 @@ export const SuggestionsTable = () => {
     setSelectedRule(rule);
     setIsRuleModalOpen(true);
   };
-
-  const mlTrigger = () => {
-    const response = axios.post(`${SERVER_URL}/api-suggestion/test`);
-  }
 
   // Debug effect for suggestions changes
   //useEffect(() => {
@@ -112,15 +111,56 @@ export const SuggestionsTable = () => {
     removeSuggestion(suggestionId);
   };
 
-  const handleAdd = (rule, suggestionId) => {
-    setIsChooseRoomModalOpen(true);
-    setSelectedRule(rule);
-    // The actual deletion will happen after successful addition in ChooseRoomModal
+  const handleAdd = async (rule, suggestionId) => {
+    // Add to loading set
+    setLoadingSuggestions(prev => new Set(prev).add(suggestionId));
+    
+    try {
+      console.log('Creating rule from suggestion:', rule);
+      
+      // First create the rule
+      await createRuleFromSuggestion(rule, suggestionId, spaceId);
+      
+      // Only remove the suggestion if rule creation was successful
+      handleDelete(suggestionId);
+      toast.success('Rule created successfully from suggestion!');
+      
+    } catch (error) {
+      console.error('Error creating rule from suggestion:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to create rule';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response && error.response.data) {
+        errorMessage = error.response.data.message || error.response.data;
+      }
+      
+      toast.error(`Failed to create rule: ${errorMessage}`);
+    } finally {
+      // Remove from loading set
+      setLoadingSuggestions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(suggestionId);
+        return newSet;
+      });
+    }
   };
 
   return (
     <TableContainer>
-      <TitleStyled2>Recommendations ({suggestions.length})</TitleStyled2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <TitleStyled2>Recommendations ({suggestions.length})</TitleStyled2>
+        {newSuggestionsCount > 0 && (
+          <ButtonStyled
+            className="custom-button"
+            onClick={markSuggestionsAsRead}
+            style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}
+          >
+            <i className="fa fa-check" aria-hidden="true"></i> Mark All as Read
+          </ButtonStyled>
+        )}
+      </div>
       <TableStyled>
         <thead>
           <tr>
@@ -161,14 +201,16 @@ export const SuggestionsTable = () => {
                       className="custom-button"
                       onClick={() => {
                         handleAdd(rule, suggestion.id);
-                      }
-                    }
+                      }}
+                      disabled={loadingSuggestions.has(suggestion.id)}
                     >
-                      <i className="fa fa-plus" aria-hidden="true"></i> Add
+                      <i className="fa fa-plus" aria-hidden="true"></i> 
+                      {loadingSuggestions.has(suggestion.id) ? 'Adding...' : 'Add'}
                     </ButtonStyled>
                     <ButtonStyled
                       className="custom-button"
                       onClick={() => handleDelete(suggestion.id)}
+                      disabled={loadingSuggestions.has(suggestion.id)}
                     >
                       <i className="fa fa-trash" aria-hidden="true"></i> Delete
                     </ButtonStyled>
@@ -199,19 +241,6 @@ export const SuggestionsTable = () => {
           />
         </RuleModalStyled>
       )}
-
-      {isChooseRoomModalOpen && (
-        <ChooseRoomModalStyled
-          isOpen={isChooseRoomModalOpen}
-          className={isChooseRoomModalOpen ? '' : 'closing'}
-        >
-          <ChooseRoomModal
-            selectedRule={selectedRule}
-            setIsModalOpen={setIsChooseRoomModalOpen}
-          />
-        </ChooseRoomModalStyled>
-      )}
-
 
     </TableContainer>
   );
