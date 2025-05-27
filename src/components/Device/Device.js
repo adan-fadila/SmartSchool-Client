@@ -220,6 +220,86 @@ export const Device = ({
     }
   }, [spaceId]);
 
+  // Add this useEffect to poll real light state from server
+  useEffect(() => {
+    let intervalId = null;
+  
+    const fetchRealLightState = async () => {
+      if (
+        device.device_name.toLowerCase() === "light" &&
+        raspberryPiIP &&
+        device_id
+      ) {
+        try {
+          const url = `${SERVER_URL}/api/lights/state/${encodeURIComponent(
+            device_id
+          )}?rasp_ip=${encodeURIComponent(raspberryPiIP)}`;
+          
+          const response = await axios.get(url);
+          
+          console.log("Light state response:", response.data);
+          
+          let realState = false; // Default to false
+          
+          // Extract the boolean state from the response
+          if (response.data.lightState) {
+            const lightState = response.data.lightState;
+            console.log("Light state object:", lightState);
+            
+            // Try different possible properties where the boolean might be
+            if (typeof lightState.on === 'boolean') {
+              realState = lightState.on;
+            } else if (lightState.on && typeof lightState.on.on === 'boolean') {
+              realState = lightState.on.on;
+            } else if (typeof lightState.state === 'boolean') {
+              realState = lightState.state;
+            } else if (typeof lightState.isOn === 'boolean') {
+              realState = lightState.isOn;
+            } else {
+              console.warn("Could not extract boolean from lightState:", lightState);
+              // List all properties to help debug
+              console.log("Available lightState properties:", Object.keys(lightState));
+              return; // Skip update if we can't find the state
+            }
+          } else if (typeof response.data.state === 'boolean') {
+            realState = response.data.state;
+          } else {
+            console.warn("Could not find lightState or state in response:", response.data);
+            return; // Skip update if we can't find the state
+          }
+          
+          console.log("Extracted real state:", realState, "Current state:", state);
+          
+          // Update local state only if it differs from server state
+          if (realState !== state) {
+            console.log("States differ - updating from", state, "to", realState);
+            setState(realState);
+            setcolor(realState ? "green" : "red");
+          } else {
+            console.log("States match - no update needed");
+          }
+          
+        } catch (error) {
+          console.error(`Error fetching real light state for ${device_name}:`, error.message);
+          // Silent failure - don't show snackbar for polling errors
+        }
+      }
+    };
+  
+    // Only set up polling for light devices
+    if (device.device_name.toLowerCase() === "light" && raspberryPiIP && device_id) {
+      console.log("Setting up light state polling for:", device_name);
+      fetchRealLightState(); // Initial fetch
+      intervalId = setInterval(fetchRealLightState, 6000); // Poll every 3 seconds
+    }
+  
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [device.device_name, raspberryPiIP, device_id]); // Don't include 'state' to avoid recreation
+
   useEffect(() => {
     const fetchAcState = async () => {
       if (!raspberryPiIP || !device_id) {
@@ -409,7 +489,7 @@ export const Device = ({
         }
       } else if (device.device_name.toLowerCase() === "light") {
         console.log("light clickkkkkkkkkkkkkkkkkkkkkkkkkeeeeeeddd");
-        console.log("device id is  : ",device_id);
+        console.log("device id is  : ", device_id);
         // Light device handling
         try {
           const lightPayload = {
@@ -429,7 +509,8 @@ export const Device = ({
             lightPayload
           );
 
-          if (response.data.success) {
+          // Accept any 200-level status as success
+          if (response.status >= 200 && response.status < 300) {
             console.log("Light toggled successfully:", response.data);
             setOpenSuccessSnackbar(true);
           } else {
