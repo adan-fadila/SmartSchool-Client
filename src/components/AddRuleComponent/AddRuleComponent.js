@@ -13,10 +13,13 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
   const { spaceId: contextSpaceId } = useSpace();
   const effectiveSpaceId = spaceId || contextSpaceId;
   
-  // Rule state
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [selectedCondition, setSelectedCondition] = useState('');
-  const [conditionValue, setConditionValue] = useState('');
+  // Rule state - changed to support multiple conditions
+  const [conditions, setConditions] = useState([{
+    selectedEvent: null,
+    selectedCondition: '',
+    conditionValue: ''
+  }]);
+  const [logicOperator, setLogicOperator] = useState('AND'); // New state for AND/OR logic
   const [selectedAction, setSelectedAction] = useState(null);
   const [actionState, setActionState] = useState(''); // on/off
   const [actionTemp, setActionTemp] = useState(''); // temperature for AC
@@ -134,18 +137,34 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
 
   // Update preview text whenever any value changes
   useEffect(() => {
-    if (selectedEvent && selectedCondition) {
-      let preview = '';
+    // Check if we have at least one complete condition
+    const hasValidConditions = conditions.some(condition => 
+      condition.selectedEvent && condition.selectedCondition
+    );
+    
+    if (hasValidConditions) {
+      let conditionParts = [];
       
-      // For anomalies, use the description (name) directly
-      if (selectedEvent.type === 'anomaly') {
-        preview = `if ${selectedEvent.name} ${selectedCondition}`;
-      } else {
-        preview = `if ${selectedEvent.location} ${selectedEvent.type} ${selectedCondition}`;
-        if (conditionValue && selectedEvent.type.toLowerCase() !== 'motion') {
-          preview += ` ${conditionValue}`;
+      // Build condition parts for each valid condition
+      conditions.forEach(condition => {
+        if (condition.selectedEvent && condition.selectedCondition) {
+          let conditionText = '';
+          
+          // For anomalies, use the description (name) directly
+          if (condition.selectedEvent.type === 'anomaly') {
+            conditionText = `${condition.selectedEvent.name} ${condition.selectedCondition}`;
+          } else {
+            conditionText = `${condition.selectedEvent.location} ${condition.selectedEvent.type} ${condition.selectedCondition}`;
+            if (condition.conditionValue && condition.selectedEvent.type.toLowerCase() !== 'motion') {
+              conditionText += ` ${condition.conditionValue}`;
+            }
+          }
+          
+          conditionParts.push(conditionText);
         }
-      }
+      });
+      
+      let preview = `if ${conditionParts.join(` ${logicOperator} `)}`;
       
       if (selectedAction) {
         console.log("Selected action for preview:", selectedAction);
@@ -186,7 +205,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
       
       setPreviewText(preview);
     }
-  }, [selectedEvent, selectedCondition, conditionValue, selectedAction, actionState, actionTemp, actionMode, phoneNumber]);
+  }, [conditions, selectedAction, actionState, actionTemp, actionMode, phoneNumber, logicOperator]);
 
   const getConditionOptions = (eventType) => {
     switch (eventType?.toLowerCase()) {
@@ -203,7 +222,12 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
   };
 
   const handleSubmit = async () => {
-    if (!selectedEvent || !selectedAction || !selectedCondition) {
+    // Validate that we have at least one complete condition
+    const validConditions = conditions.filter(condition => 
+      condition.selectedEvent && condition.selectedCondition
+    );
+    
+    if (validConditions.length === 0 || !selectedAction) {
       toast.error('Please complete all required fields');
       return;
     }
@@ -235,17 +259,18 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         isNotificationRule = true;
         notificationPhoneNumber = phoneNumber;
         
-        // For anomalies, use the full name as the message
-        if (selectedEvent.type === 'anomaly') {
-          notificationMessage = `${selectedEvent.name} ${selectedCondition}`;
-        } else if (selectedEvent.type.toLowerCase() === 'motion') {
-          // For motion, don't include conditionValue
-          notificationMessage = `${selectedEvent.location} ${selectedEvent.type} ${selectedCondition}`.trim();
-        } else {
-          // For other regular events, format the message using event details with conditionValue
-          notificationMessage = `${selectedEvent.location} ${selectedEvent.type} ${selectedCondition} ${conditionValue}`.trim();
-        }
+        // Build notification message from all conditions
+        const messageParts = validConditions.map(condition => {
+          if (condition.selectedEvent.type === 'anomaly') {
+            return `${condition.selectedEvent.name} ${condition.selectedCondition}`;
+          } else if (condition.selectedEvent.type.toLowerCase() === 'motion') {
+            return `${condition.selectedEvent.location} ${condition.selectedEvent.type} ${condition.selectedCondition}`.trim();
+          } else {
+            return `${condition.selectedEvent.location} ${condition.selectedEvent.type} ${condition.selectedCondition} ${condition.conditionValue}`.trim();
+          }
+        });
         
+        notificationMessage = messageParts.join(` ${logicOperator} `);
         actionString = `send sms to ${phoneNumber}`;
       } else if (selectedAction.type === 'ac' && actionState === 'on') {
         if (actionTemp) actionValue += ` ${actionTemp}`;
@@ -255,29 +280,36 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         actionString = `${selectedAction.name} ${actionValue}`;
       }
 
-      // For anomalies, we'll use the description (name) for display, but
-      // we need to ensure the backend gets the proper information
-      let eventString;
-      if (selectedEvent.type === 'anomaly') {
-        eventString = `${selectedEvent.originalName || selectedEvent.name} ${selectedCondition}`;
-      } else if (selectedEvent.type.toLowerCase() === 'motion') {
-        // For motion, use the true/false value directly without additional conditionValue
-        eventString = `${selectedEvent.name} ${selectedCondition}`;
-      } else {
-        eventString = `${selectedEvent.name} ${selectedCondition} ${conditionValue}`;
-      }
+      // Build event string from all conditions
+      const eventParts = validConditions.map(condition => {
+        if (condition.selectedEvent.type === 'anomaly') {
+          return `${condition.selectedEvent.originalName || condition.selectedEvent.name} ${condition.selectedCondition}`;
+        } else if (condition.selectedEvent.type.toLowerCase() === 'motion') {
+          return `${condition.selectedEvent.name} ${condition.selectedCondition}`;
+        } else {
+          return `${condition.selectedEvent.name} ${condition.selectedCondition} ${condition.conditionValue}`;
+        }
+      });
+      
+      const eventString = eventParts.join(` ${logicOperator} `);
 
-      // Determine room_id for the rule
-      let ruleRoomId = selectedEvent.room_id;
+      // For backward compatibility with the backend, we need to store a single condition
+      // in the 'rule' field that the backend can parse when toggling
+      // We'll use the first condition as the primary rule for backend compatibility
+      const primaryEventString = eventParts[0];
+      const backendCompatibleRule = `${primaryEventString} then ${actionString}`;
+
+      // Determine room_id for the rule (use the first condition's room)
+      let ruleRoomId = validConditions[0].selectedEvent.room_id;
       
       // If room_id is not available directly (especially for anomalies)
-      if (!ruleRoomId && selectedEvent.location) {
+      if (!ruleRoomId && validConditions[0].selectedEvent.location) {
         try {
           const roomResponse = await fetch(`${SERVER_URL}/api-room/rooms/space/${effectiveSpaceId}`);
           if (roomResponse.ok) {
             const roomsData = await roomResponse.json();
             const room = roomsData.find(r => 
-              r.name.toLowerCase() === selectedEvent.location.toLowerCase()
+              r.name.toLowerCase() === validConditions[0].selectedEvent.location.toLowerCase()
             );
             
             if (room) {
@@ -301,12 +333,16 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         description: ruleDescription,
         event: eventString,
         action: actionString,
+        rule: backendCompatibleRule, // Backend-compatible single condition rule
         room_id: ruleRoomId,
         space_id: effectiveSpaceId,
         created_by: fullName || 'User',
         isNotificationRule: isNotificationRule,
         notificationPhoneNumber: notificationPhoneNumber,
-        notificationMessage: notificationMessage
+        notificationMessage: notificationMessage,
+        isMultiCondition: validConditions.length > 1, // Flag to indicate multi-condition rule
+        multiConditionEvent: validConditions.length > 1 ? eventString : null, // Store full multi-condition string
+        logicOperator: logicOperator,
       };
 
       const response = await fetch(`${SERVER_URL}/api-rule/rules`, {
@@ -332,9 +368,12 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
   };
 
   const resetForm = () => {
-    setSelectedEvent(null);
-    setSelectedCondition('');
-    setConditionValue('');
+    setConditions([{
+      selectedEvent: null,
+      selectedCondition: '',
+      conditionValue: ''
+    }]);
+    setLogicOperator('AND');
     setSelectedAction(null);
     setActionState('');
     setActionTemp('');
@@ -351,7 +390,12 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
   };
 
   const canSubmit = () => {
-    if (!selectedEvent || !selectedAction || !selectedCondition) return false;
+    // Check if we have at least one complete condition
+    const validConditions = conditions.filter(condition => 
+      condition.selectedEvent && condition.selectedCondition
+    );
+    
+    if (validConditions.length === 0 || !selectedAction) return false;
     
     // Check if this is the SMS notification service by type
     const isSmsNotification = selectedAction.type === 'sms';
@@ -365,76 +409,155 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
     return actionState !== '';
   };
 
+  // Helper functions for managing multiple conditions
+  const addCondition = () => {
+    setConditions([...conditions, {
+      selectedEvent: null,
+      selectedCondition: '',
+      conditionValue: ''
+    }]);
+  };
+
+  const removeCondition = (index) => {
+    if (conditions.length > 1) {
+      const newConditions = conditions.filter((_, i) => i !== index);
+      setConditions(newConditions);
+    }
+  };
+
+  const updateCondition = (index, field, value) => {
+    const newConditions = [...conditions];
+    newConditions[index] = {
+      ...newConditions[index],
+      [field]: value
+    };
+    setConditions(newConditions);
+  };
+
   return (
     <div className={classes.formContainer}>
       <div className={classes.section}>
-        <h4>1. Select Trigger Event</h4>
+        <h4>1. Select Trigger Events</h4>
         
-        <div className={classes.availableOptionsContainer}>
-          <div className={classes.availableOptions}>
-            <h4>Regular Events</h4>
-            <div className={classes.optionsList}>
-              {availableEvents.map((event, index) => (
-                <div
-                  key={`event-${index}`}
-                  className={`${classes.clickableOption} ${selectedEvent?.name === event.name ? classes.activeOptions : ''}`}
-                  onClick={() => setSelectedEvent(event)}
-                >
-                  {event.location} - {event.type} (Current: {String(event.currentValue)})
+        <div className={classes.conditionsRow}>
+          {conditions.map((condition, index) => (
+            <div key={index} className={classes.conditionGroup}>
+              <div className={classes.conditionHeader}>
+                <h5>Condition {index + 1}</h5>
+                {conditions.length > 1 && (
+                  <button 
+                    type="button"
+                    onClick={() => removeCondition(index)}
+                    className={classes.removeButton}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              
+              <div className={classes.availableOptionsContainer}>
+                <div className={classes.availableOptions}>
+                  <h6>Regular Events</h6>
+                  <div className={classes.optionsList}>
+                    {availableEvents.map((event, eventIndex) => (
+                      <div
+                        key={`event-${eventIndex}`}
+                        className={`${classes.clickableOption} ${condition.selectedEvent?.name === event.name ? classes.activeOptions : ''}`}
+                        onClick={() => updateCondition(index, 'selectedEvent', event)}
+                      >
+                        {event.location} - {event.type} ({String(event.currentValue)})
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-          
-          <div className={classes.availableOptions}>
-            <h4>Anomaly Events</h4>
-            <div className={classes.optionsList}>
-              {availableAnomalies.map((anomaly, index) => (
-                <div
-                  key={`anomaly-${index}`}
-                  className={`${classes.clickableOption} ${selectedEvent?.name === anomaly.name ? classes.activeOptions : ''}`}
-                  onClick={() => setSelectedEvent(anomaly)}
-                >
-                  {anomaly.name}
+                
+                <div className={classes.availableOptions}>
+                  <h6>Anomaly Events</h6>
+                  <div className={classes.optionsList}>
+                    {availableAnomalies.map((anomaly, anomalyIndex) => (
+                      <div
+                        key={`anomaly-${anomalyIndex}`}
+                        className={`${classes.clickableOption} ${condition.selectedEvent?.name === anomaly.name ? classes.activeOptions : ''}`}
+                        onClick={() => updateCondition(index, 'selectedEvent', anomaly)}
+                      >
+                        {anomaly.name}
+                      </div>
+                    ))}
+                    {availableAnomalies.length === 0 && (
+                      <div className={classes.noOptions}>No anomaly events available</div>
+                    )}
+                  </div>
                 </div>
-              ))}
-              {availableAnomalies.length === 0 && (
-                <div className={classes.noOptions}>No anomaly events available</div>
+              </div>
+
+              {condition.selectedEvent && (
+                <div className={classes.conditionContainer}>
+                  <select
+                    value={condition.selectedCondition}
+                    onChange={(e) => updateCondition(index, 'selectedCondition', e.target.value)}
+                    className={classes.inputColumn}
+                  >
+                    <option value="">Select condition</option>
+                    {getConditionOptions(condition.selectedEvent?.type).map((conditionOption) => (
+                      <option key={conditionOption} value={conditionOption}>{conditionOption}</option>
+                    ))}
+                  </select>
+                  {condition.selectedCondition && condition.selectedEvent.type !== 'anomaly' && condition.selectedEvent.type.toLowerCase() !== 'motion' && (
+                    <input
+                      type={isNumericCondition(condition.selectedEvent?.type) ? "number" : "text"}
+                      value={condition.conditionValue}
+                      onChange={(e) => updateCondition(index, 'conditionValue', e.target.value)}
+                      placeholder="Enter value"
+                      className={classes.inputColumn}
+                    />
+                  )}
+                </div>
               )}
             </div>
+          ))}
+        </div>
+        
+        {conditions.length > 1 && (
+          <div className={classes.logicOperatorSection}>
+            <h6>Logic Operator</h6>
+            <div className={classes.logicOperatorContainer}>
+              <label className={classes.radioLabel}>
+                <input
+                  type="radio"
+                  name="logicOperator"
+                  value="AND"
+                  checked={logicOperator === 'AND'}
+                  onChange={(e) => setLogicOperator(e.target.value)}
+                />
+                <span>AND (all conditions must be true)</span>
+              </label>
+              <label className={classes.radioLabel}>
+                <input
+                  type="radio"
+                  name="logicOperator"
+                  value="OR"
+                  checked={logicOperator === 'OR'}
+                  onChange={(e) => setLogicOperator(e.target.value)}
+                />
+                <span>OR (any condition can be true)</span>
+              </label>
+            </div>
           </div>
+        )}
+        
+        <div className={classes.addConditionSection}>
+          <button 
+            type="button"
+            onClick={addCondition}
+            className={classes.addConditionButton}
+          >
+            Add Another Condition
+          </button>
         </div>
       </div>
 
-      {selectedEvent && (
-        <div className={classes.section}>
-          <h4>2. Set Condition</h4>
-          <div className={classes.conditionContainer}>
-            <select
-              value={selectedCondition}
-              onChange={(e) => setSelectedCondition(e.target.value)}
-              className={classes.inputColumn}
-            >
-              <option value="">Select condition</option>
-              {getConditionOptions(selectedEvent?.type).map((condition) => (
-                <option key={condition} value={condition}>{condition}</option>
-              ))}
-            </select>
-            {selectedCondition && selectedEvent.type !== 'anomaly' && (
-              <input
-                type={isNumericCondition(selectedEvent?.type) ? "number" : "text"}
-                value={conditionValue}
-                onChange={(e) => setConditionValue(e.target.value)}
-                placeholder="Enter value"
-                className={classes.inputColumn}
-              />
-            )}
-          </div>
-        </div>
-      )}
-
       <div className={classes.section}>
-        <h4>3. Select Action</h4>
+        <h4>2. Select Action</h4>
         <div className={classes.optionsList}>
           {availableActions.map((action, index) => (
             <div
@@ -456,17 +579,14 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
 
         {selectedAction && (
           <div className={classes.actionDetails}>
-            {/* Log the action name and check for SMS */}
-            {console.log("Rendering action details for:", selectedAction.name, "Type:", selectedAction.type, "Is SMS?", selectedAction.type === 'sms')}
-            
             {selectedAction.type === 'sms' ? (
               <>
-                <label>Enter phone number for SMS notification:</label>
+                <label>Phone number:</label>
                 <input
                   type="text"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Enter phone number (e.g., +1234567890)"
+                  placeholder="e.g., +1234567890"
                   className={classes.inputColumn}
                 />
               </>
@@ -524,14 +644,7 @@ const AddRuleComponent = ({ onSuccess, spaceId, fullName }) => {
         Create Rule
       </button>
 
-      <div className={classes.hint}>
-        <p>Format examples:</p>
-        <p>- if Living Room Temperature {'>'} 26 then Living Room AC on</p>
-        <p>- if Living Room Temperature {'>'} 10 then Living Room AC on 20 heat</p>
-        <p>- if Kitchen Motion detected then Kitchen Light on</p>
-        <p>- if living room temperature pointwise anomaly detected then Living Room Light on</p>
-        <p>- if Server Room Temperature {'>'} 28 then send sms to +1234567890</p>
-      </div>
+      
     </div>
   );
 };
