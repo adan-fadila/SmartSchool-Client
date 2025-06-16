@@ -60,9 +60,24 @@ export const SuggestionsProvider = ({ children }) => {
       console.log("Global suggestions update received:", recommendations);
       if (Array.isArray(recommendations)) {
         setSuggestions(prev => {
-          // Merge new recommendations with existing ones, avoiding duplicates
+          // Merge new recommendations with existing ones, avoiding duplicates by ID and normalized_rule
           const existingIds = new Set(prev.map(s => s.id));
-          const newRecommendations = recommendations.filter(r => !existingIds.has(r.id));
+          const existingRules = new Set(prev.map(s => s.normalized_rule));
+          
+          const newRecommendations = recommendations.filter(r => {
+            // Skip if ID already exists
+            if (existingIds.has(r.id)) {
+              return false;
+            }
+            
+            // Skip if normalized_rule already exists
+            if (existingRules.has(r.normalized_rule)) {
+              console.log('Ignoring duplicate recommendation with normalized_rule:', r.normalized_rule);
+              return false;
+            }
+            
+            return true;
+          });
           
           if (newRecommendations.length > 0) {
             console.log('Adding new recommendations:', newRecommendations);
