@@ -153,7 +153,6 @@ const RoomsDashboard = ({ token }) => {
     const onClickRoomHandler = (roomId) => {
           // navigate(`/room/${roomId}`);
       navigate(`/spaces/${spaceId}/rooms-dashboard/room/${roomId}`);
-
     };
 
   return (
@@ -197,11 +196,6 @@ const RoomsDashboard = ({ token }) => {
           <div className={roomsTest.length === 1 ? `${classes.RoomsContainer} ${classes.RoomsContainerStart}` : classes.RoomsContainer}>
               {roomsTest.map((roomData) => {
                   const roomId = String(roomData.id); // Convert to string for consistent comparison
-                  console.log("Rendering room:", {
-                      id: roomId,
-                      idType: typeof roomId, // Should be 'string'
-                      hasAnomaly: Boolean(anomalies.rooms[roomId]?.hasAnomaly)
-                  });
                   return (
                       <div
                           data-test={`room-card-${roomId}`}

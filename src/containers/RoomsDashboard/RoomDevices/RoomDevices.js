@@ -522,6 +522,12 @@ const RoomDevices = () => {
     console.log("Anomaly dismissed successfully");
   };
 
+  // Add handler to close modal without dismissing anomaly
+  const handleCloseAnomalyModal = () => {
+    setShowAnomalyModal(false);
+    // Don't clear the anomaly - just close the modal
+  };
+
   if (!devices) return null;
 
   // Keep devices and sensors separate
@@ -574,7 +580,7 @@ const RoomDevices = () => {
                 setPumpDuration={device.device_type === 'pump' ? setPumpDuration : undefined}
                 spaceId={spaceId}
                 isRpiSensor={false}
-                hasAnomaly={anomalies.rooms[id]?.deviceType === 'AC' && device.device_id === DEVICES_IDS_MAP.AC}
+                hasAnomaly={anomalies.rooms[id]?.deviceType === 'AC' && device.device_id === DEVICES_IDS_MAP.AC && !showAnomalyModal}
                 onAnomalyClick={handleDeviceAnomalyClick}
               />
             </div>
@@ -605,7 +611,7 @@ const RoomDevices = () => {
                     setPumpDuration={undefined}
                     spaceId={spaceId}
                     isRpiSensor={true}
-                    hasAnomaly={anomalies.rooms[id]?.deviceType === sensor.device_type.toLowerCase()}
+                    hasAnomaly={anomalies.rooms[id]?.deviceType === sensor.device_type.toLowerCase() && !showAnomalyModal}
                     onAnomalyClick={handleDeviceAnomalyClick}
                   />
                 </div>
@@ -617,7 +623,7 @@ const RoomDevices = () => {
 
       <ModalStyled
         isOpen={showAnomalyModal}
-        onRequestClose={() => setShowAnomalyModal(false)}
+        onRequestClose={handleCloseAnomalyModal}
         contentLabel="Anomaly Details"
       >
         <div className={classes.AnomalyModal}>
