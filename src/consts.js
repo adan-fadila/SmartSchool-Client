@@ -1,5 +1,5 @@
 // export const SERVER_URL = 'https://software.shenkar.cloud:8080'
-export const SERVER_URL = 'http://51.17.250.240:8001'
+export const SERVER_URL = 'https://smartspaceshenkar.duckdns.org'
 
 
 
