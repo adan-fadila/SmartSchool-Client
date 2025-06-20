@@ -5,9 +5,9 @@ function connectWebSocket() {
   if (!socket) {
     const WebSocket = window.WebSocket;
     if (window.location.protocol === "https:") {
-        socket = new WebSocket('wss://software.shenkar.cloud:8080');
+        socket = new WebSocket('wss://software.shenkar.cloud/ws');
     } else {
-        socket = new WebSocket('ws://software.shenkar.cloud:8001');
+        socket = new WebSocket('ws://software.shenkar.cloud/ws');
     }
     socket.addEventListener('open', function (event) {
       console.log('WebSocket connection opened');

@@ -16,9 +16,9 @@ export const Notification = () => {
   
   useEffect(() => {
     if (window.location.protocol === "https:") {
-      socket = new WebSocket('wss://software.shenkar.cloud:8080');
+      socket = new WebSocket('wss://software.shenkar.cloud/ws');
   } else {
-      socket = new WebSocket('ws://software.shenkar.cloud:8001');
+      socket = new WebSocket('ws://software.shenkar.cloud/ws');
   }
     socket.addEventListener('message', handleMessageReceived);
 
